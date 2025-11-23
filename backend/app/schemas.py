@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 # ------------------ USER -------------------
 class UserCreate(BaseModel):
@@ -37,3 +38,20 @@ class AccountOut(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class TransactionCreate(BaseModel):
+    src_account: int
+    dest_account: int
+    amount: float
+
+
+class TransactionOut(BaseModel):
+    id: int
+    src_account: int
+    dest_account: int
+    amount: float
+    status: str
+    timestamp: datetime
+
+    class Config:
+        orm_mode = True
