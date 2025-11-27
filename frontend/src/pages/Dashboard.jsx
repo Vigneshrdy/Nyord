@@ -133,38 +133,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Recent Transactions */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
-              <button className="text-blue-600 dark:text-blue-400 text-sm font-medium hover:underline">View All</button>
-            </div>
-            
-            <div className="space-y-4">
-              {transactions.map((txn) => (
-                <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      txn.type === 'credit' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
-                    }`}>
-                      <span className={`material-symbols-outlined text-lg ${
-                        txn.type === 'credit' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                      }`}>
-                        {txn.type === 'credit' ? 'arrow_downward' : 'arrow_upward'}
-                      </span>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-white text-sm">{txn.name}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{txn.category}</div>
-                    </div>
-                  </div>
-                  <div className={`font-semibold ${txn.type === 'credit' ? 'text-green-600 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
-                    {txn.type === 'credit' ? '+' : '-'}${Math.abs(txn.amount).toFixed(2)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+
         </div>
       </div>
     </div>
