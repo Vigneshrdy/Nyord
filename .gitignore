@@ -1,5 +1,6 @@
-<<<<<<< HEAD
 # Python
+backend/app/__pycache__/
+backend/app/routers/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -80,14 +81,11 @@ dmypy.json
 cython_debug/
 
 # Node.js
-=======
 # Node
->>>>>>> 19a9ba0830da13dbf91eb897b50205d0b41c7e1c
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-<<<<<<< HEAD
 lerna-debug.log*
 .pnpm-debug.log*
 
@@ -235,7 +233,6 @@ dist/
 # FastAPI specific
 .pytest_cache/
 __pycache__/
-=======
 .pnpm-debug.log*
 dist/
 build/
@@ -265,16 +262,13 @@ pip-delete-this-directory.txt
 
 # FastAPI/UVicorn
 .uvicorn.log
->>>>>>> 19a9ba0830da13dbf91eb897b50205d0b41c7e1c
 
 # Celery
 celerybeat-schedule
 celerybeat.pid
 
 # RabbitMQ
-<<<<<<< HEAD
 rabbitmq.conf.local
-=======
 .rabbitmq/
 
 # VS Code
@@ -295,4 +289,3 @@ logs/
 tmp/
 *.swp
 *.swo
->>>>>>> 19a9ba0830da13dbf91eb897b50205d0b41c7e1c
