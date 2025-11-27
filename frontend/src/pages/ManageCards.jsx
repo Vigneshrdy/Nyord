@@ -8,6 +8,10 @@ const ManageCards = () => {
   const [requestLoading, setRequestLoading] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [selectedCardType, setSelectedCardType] = useState('Standard');
+  const [cardPin, setCardPin] = useState('');
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinModalAction, setPinModalAction] = useState(null); // { action: 'block'/'unblock', cardId: number }
+  const [pinInput, setPinInput] = useState('');
   const [cardSettings, setCardSettings] = useState({
     onlineTransactions: true,
     contactlessPayments: true,
@@ -33,14 +37,20 @@ const ManageCards = () => {
   };
 
   const handleRequestCard = async () => {
+    if (!cardPin || cardPin.length !== 4 || !/^\d{4}$/.test(cardPin)) {
+      alert('Please enter a valid 4-digit PIN');
+      return;
+    }
     try {
       setRequestLoading(true);
       const newCard = await cardsAPI.requestCard({
         card_type: selectedCardType,
         credit_limit: 0, // Backend will use default based on type
+        pin: cardPin,
       });
       setCards([...cards, newCard]);
       setShowRequestForm(false);
+      setCardPin('');
       setActiveCard(cards.length); // Select the newly created card
     } catch (e) {
       console.error('Failed to request card', e);
@@ -50,13 +60,32 @@ const ManageCards = () => {
     }
   };
 
-  const handleBlockCard = async (cardId) => {
+  const openPinModal = (action, cardId) => {
+    setPinModalAction({ action, cardId });
+    setPinInput('');
+    setShowPinModal(true);
+  };
+
+  const handlePinSubmit = async () => {
+    if (!pinInput || pinInput.length !== 4 || !/^\d{4}$/.test(pinInput)) {
+      alert('Please enter a valid 4-digit PIN');
+      return;
+    }
+
     try {
-      const updated = await cardsAPI.blockCard(cardId);
+      const { action, cardId } = pinModalAction;
+      let updated;
+      if (action === 'block') {
+        updated = await cardsAPI.blockCard(cardId, pinInput);
+      } else if (action === 'unblock') {
+        updated = await cardsAPI.unblockCard(cardId, pinInput);
+      }
       setCards(cards.map(c => c.id === updated.id ? updated : c));
+      setShowPinModal(false);
+      setPinInput('');
     } catch (e) {
-      console.error('Failed to block card', e);
-      alert('Failed to block card.');
+      console.error('Failed to process action', e);
+      alert(e.message || 'Invalid PIN or action failed');
     }
   };
 
@@ -150,17 +179,30 @@ const ManageCards = () => {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                   <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Request New Card</h3>
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Card Type</label>
-                      <select value={selectedCardType} onChange={(e) => setSelectedCardType(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                        <option value="Standard">Standard ($5,000 limit)</option>
-                        <option value="Gold">Gold ($15,000 limit)</option>
-                        <option value="Platinum">Platinum ($25,000 limit)</option>
-                        <option value="Premium">Premium ($50,000 limit)</option>
-                      </select>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Card Type</label>
+                        <select value={selectedCardType} onChange={(e) => setSelectedCardType(e.target.value)} className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                          <option value="Standard">Standard ($5,000 limit)</option>
+                          <option value="Gold">Gold ($15,000 limit)</option>
+                          <option value="Platinum">Platinum ($25,000 limit)</option>
+                          <option value="Premium">Premium ($50,000 limit)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Set 4-Digit PIN</label>
+                        <input
+                          type="password"
+                          maxLength={4}
+                          value={cardPin}
+                          onChange={(e) => setCardPin(e.target.value.replace(/\D/g, ''))}
+                          placeholder="Enter 4-digit PIN"
+                          className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
                     </div>
-                    <div className="flex gap-3">
-                      <button onClick={() => setShowRequestForm(false)} className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
+                    <div className="flex gap-3 mt-6">
+                      <button onClick={() => { setShowRequestForm(false); setCardPin(''); }} className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</button>
                       <button onClick={handleRequestCard} disabled={requestLoading} className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60">{requestLoading ? 'Requesting...' : 'Request Card'}</button>
                     </div>
                   </div>
@@ -223,21 +265,26 @@ const ManageCards = () => {
 
                     {/* Action Buttons for each card */}
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => card.status === 'ACTIVE' && handleBlockCard(card.id)}
-                        disabled={card.status !== 'ACTIVE'}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="material-symbols-outlined text-lg">block</span>
-                        {card.status === 'BLOCKED' ? 'Blocked' : 'Block Card'}
-                      </button>
+                      {card.status === 'ACTIVE' ? (
+                        <button
+                          onClick={() => openPinModal('block', card.id)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-sm font-medium"
+                        >
+                          <span className="material-symbols-outlined text-lg">block</span>
+                          Block Card
+                        </button>
+                      ) : card.status === 'BLOCKED' ? (
+                        <button
+                          onClick={() => openPinModal('unblock', card.id)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-sm font-medium"
+                        >
+                          <span className="material-symbols-outlined text-lg">lock_open</span>
+                          Unblock Card
+                        </button>
+                      ) : null}
                       <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all text-sm font-medium">
                         <span className="material-symbols-outlined text-lg">pin</span>
                         Change PIN
-                      </button>
-                      <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-sm font-medium">
-                        <span className="material-symbols-outlined text-lg">receipt_long</span>
-                        Statements
                       </button>
                     </div>
                   </div>
@@ -336,6 +383,43 @@ const ManageCards = () => {
            
           </div>
         </div>
+
+        {/* PIN Verification Modal */}
+        {showPinModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+                {pinModalAction?.action === 'block' ? 'Block Card' : 'Unblock Card'}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Enter your 4-digit PIN to {pinModalAction?.action} this card.
+              </p>
+              <input
+                type="password"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter PIN"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowPinModal(false); setPinInput(''); }}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePinSubmit}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

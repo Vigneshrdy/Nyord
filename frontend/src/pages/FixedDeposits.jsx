@@ -229,15 +229,6 @@ const FixedDeposits = () => {
               </form>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Current Interest Rates</h2>
-              {[{tenure:'6 months',rate:7.0},{tenure:'1 year',rate:7.5},{tenure:'2 years',rate:8.0}].map((i,idx)=>(
-                <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">{i.tenure}</span>
-                  <span className="text-green-600 dark:text-green-400 font-bold">{i.rate}%</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

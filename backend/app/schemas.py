@@ -139,6 +139,7 @@ class LoanPayment(BaseModel):
 class CardCreate(BaseModel):
     card_type: str  # 'Premium', 'Platinum', 'Gold', 'Standard'
     credit_limit: float = 5000.0
+    pin: str  # 4-digit PIN
 
 
 class CardOut(BaseModel):
@@ -157,3 +158,7 @@ class CardOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CardBlockRequest(BaseModel):
+    pin: str  # 4-digit PIN for verification

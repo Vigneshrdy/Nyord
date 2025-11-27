@@ -190,14 +190,16 @@ export const cardsAPI = {
   getCard: async (cardId) => {
     return await apiRequest(`/cards/${cardId}`);
   },
-  blockCard: async (cardId) => {
+  blockCard: async (cardId, pin) => {
     return await apiRequest(`/cards/${cardId}/block`, {
       method: 'POST',
+      body: JSON.stringify({ pin }),
     });
   },
-  unblockCard: async (cardId) => {
+  unblockCard: async (cardId, pin) => {
     return await apiRequest(`/cards/${cardId}/unblock`, {
       method: 'POST',
+      body: JSON.stringify({ pin }),
     });
   },
 };

@@ -106,6 +106,7 @@ class Card(Base):
     card_holder = Column(String, nullable=False)
     expiry_date = Column(String, nullable=False)  # MM/YY format
     cvv = Column(String, nullable=False)
+    pin = Column(String, nullable=False)  # Hashed 4-digit PIN
     credit_limit = Column(Float, default=0.0)
     available_credit = Column(Float, default=0.0)
     status = Column(String, default="PENDING")  # PENDING, ACTIVE, BLOCKED, EXPIRED
