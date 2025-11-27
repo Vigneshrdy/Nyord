@@ -11,7 +11,6 @@ import ManageCards from './pages/ManageCards';
 import AccountStatements from './pages/AccountStatements';
 import Loans from './pages/Loans';
 import FixedDeposits from './pages/FixedDeposits';
-import Stocks from './pages/Stocks';
 import Profile from './pages/Profile';
 import Help from './pages/Help';
 
@@ -51,11 +50,6 @@ function App() {
             <Route path="/fixed-deposits" element={
               <ProtectedRoute>
                 <FixedDeposits />
-              </ProtectedRoute>
-            } />
-            <Route path="/stocks" element={
-              <ProtectedRoute>
-                <Stocks />
               </ProtectedRoute>
             } />
             <Route path="/profile" element={

@@ -81,14 +81,27 @@ function MobileNav({ nav }) {
               </p>
               <div className="flex flex-col gap-3">
                 {category.items.map((item, idx) => (
-                  <Link
-                    key={idx}
-                    to={item.href}
-                    className="text-2xl font-medium hover:text-primary transition-colors"
-                    onClick={() => setOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
+                  item.external ? (
+                    <a
+                      key={idx}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-2xl font-medium hover:text-primary transition-colors"
+                      onClick={() => setOpen(false)}
+                    >
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={idx}
+                      to={item.href}
+                      className="text-2xl font-medium hover:text-primary transition-colors"
+                      onClick={() => setOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  )
                 ))}
               </div>
             </div>
@@ -186,7 +199,7 @@ const navigationLinks = [
       { href: "/statements", label: "Statements" },
       { href: "/loans", label: "Loans" },
       { href: "/fixed-deposits", label: "Fixed Deposits" },
-      { href: "/stocks", label: "Stocks" },
+      { href: "https://www.tradingview.com/", label: "Stocks", external: true },
       { href: "/profile", label: "Settings" },
     ],
   },
@@ -269,17 +282,31 @@ export default function Navbar() {
               <NavigationMenuList>
                 {navigationLinks[0].items.map((link, index) => (
                   <NavigationMenuItem key={index} asChild>
-                    <Link
-                      to={link.href}
-                      className={cn(
-                        "flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all outline-none",
-                        isActive(link.href)
-                          ? "text-foreground bg-accent"
-                          : "text-foreground/60 hover:bg-accent hover:text-foreground"
-                      )}
-                    >
-                      {link.label}
-                    </Link>
+                    {link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={cn(
+                          "flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all outline-none",
+                          "text-foreground/60 hover:bg-accent hover:text-foreground"
+                        )}
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.href}
+                        className={cn(
+                          "flex flex-col gap-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all outline-none",
+                          isActive(link.href)
+                            ? "text-foreground bg-accent"
+                            : "text-foreground/60 hover:bg-accent hover:text-foreground"
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </NavigationMenuItem>
                 ))}
               </NavigationMenuList>
