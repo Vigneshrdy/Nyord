@@ -99,3 +99,7 @@ CREATE TABLE cards (
     issued_date DATE,
     gradient_colors VARCHAR(200)
 );
+
+
+ALTER TABLE users RENAME COLUMN password_hash TO hashed_password;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS pin VARCHAR;
