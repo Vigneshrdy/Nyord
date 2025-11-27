@@ -121,6 +121,10 @@ export const profileAPI = {
 
 // Transactions API
 export const transactionsAPI = {
+  getMyTransactions: async () => {
+    return await apiRequest('/transactions/me');
+  },
+
   getTransactions: async () => {
     return await apiRequest('/transactions');
   },

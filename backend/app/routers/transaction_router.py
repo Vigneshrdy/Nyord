@@ -57,6 +57,26 @@ def initiate_transaction(txn: TransactionCreate,
 
     return new_txn
 
+@router.get("/me", response_model=list[TransactionOut])
+def get_my_transactions(db: Session = Depends(get_db),
+                        user_id: int = Depends(get_user_id)):
+    """Get all transactions where user's accounts are involved (as source or destination)"""
+    
+    # Get all account IDs owned by the user
+    user_account_ids = [acc.id for acc in db.query(Account).filter(Account.user_id == user_id).all()]
+    
+    if not user_account_ids:
+        return []
+    
+    # Fetch transactions where user's accounts are either source or destination
+    transactions = db.query(Transaction).filter(
+        (Transaction.src_account.in_(user_account_ids)) | 
+        (Transaction.dest_account.in_(user_account_ids))
+    ).order_by(Transaction.timestamp.desc()).all()
+    
+    return transactions
+
+
 @router.get("/{txn_id}", response_model=TransactionOut)
 def get_transaction(txn_id: int,
                     db: Session = Depends(get_db),

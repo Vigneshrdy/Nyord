@@ -1,19 +1,135 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { transactionsAPI, accountsAPI } from '../services/api';
 
 const AccountStatements = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('thisMonth');
-  const [selectedAccount, setSelectedAccount] = useState('all');
+  const [rawTransactions, setRawTransactions] = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const transactions = [
-    { id: 1, date: '2024-01-15', description: 'Amazon Purchase', category: 'Shopping', amount: -89.99, balance: 12360.01, type: 'debit' },
-    { id: 2, date: '2024-01-14', description: 'Salary Deposit', category: 'Income', amount: 5000.00, balance: 12450.00, type: 'credit' },
-    { id: 3, date: '2024-01-13', description: 'Netflix Subscription', category: 'Entertainment', amount: -15.99, balance: 7450.00, type: 'debit' },
-    { id: 4, date: '2024-01-12', description: 'Grocery Store', category: 'Food & Dining', amount: -125.50, balance: 7465.99, type: 'debit' },
-    { id: 5, date: '2024-01-11', description: 'Electricity Bill', category: 'Utilities', amount: -85.00, balance: 7591.49, type: 'debit' },
-    { id: 6, date: '2024-01-10', description: 'Uber Ride', category: 'Transportation', amount: -18.50, balance: 7676.49, type: 'debit' },
-    { id: 7, date: '2024-01-09', description: 'Coffee Shop', category: 'Food & Dining', amount: -12.50, balance: 7694.99, type: 'debit' },
-    { id: 8, date: '2024-01-08', description: 'Transfer from Savings', category: 'Transfer', amount: 500.00, balance: 7707.49, type: 'credit' },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [txns, accs] = await Promise.all([
+          transactionsAPI.getMyTransactions(),
+          accountsAPI.getAccounts()
+        ]);
+        setRawTransactions(txns || []);
+        setAccounts(accs || []);
+      } catch (e) {
+        console.error('Failed to fetch data', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Build account map for quick lookup
+  const accountMap = useMemo(() => {
+    const map = {};
+    accounts.forEach(acc => {
+      map[acc.id] = acc;
+    });
+    return map;
+  }, [accounts]);
+
+  // Filter transactions by period
+  const filteredTransactions = useMemo(() => {
+    const now = new Date();
+    const getStartDate = () => {
+      switch (selectedPeriod) {
+        case 'thisMonth':
+          return new Date(now.getFullYear(), now.getMonth(), 1);
+        case 'lastMonth':
+          return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        case 'last3Months':
+          return new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        case 'last6Months':
+          return new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        case 'thisYear':
+          return new Date(now.getFullYear(), 0, 1);
+        default:
+          return new Date(0); // all time
+      }
+    };
+
+    const startDate = getStartDate();
+    return rawTransactions.filter(txn => {
+      const txnDate = new Date(txn.timestamp);
+      return txnDate >= startDate;
+    });
+  }, [rawTransactions, selectedPeriod]);
+
+  // Compute summary stats
+  const summary = useMemo(() => {
+    if (!accounts.length || !filteredTransactions.length) {
+      return { opening: 0, credits: 0, debits: 0, closing: 0 };
+    }
+
+    // For simplicity, use current total balance as closing
+    const closing = accounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+
+    let credits = 0;
+    let debits = 0;
+
+    filteredTransactions.forEach(txn => {
+      const amount = txn.amount || 0;
+      const isCredit = accounts.some(acc => acc.id === txn.dest_account);
+      const isDebit = accounts.some(acc => acc.id === txn.src_account);
+
+      // If both source and dest belong to user, it's an internal transfer (count as both)
+      if (isCredit && !isDebit) {
+        credits += amount;
+      }
+      if (isDebit && !isCredit) {
+        debits += amount;
+      }
+    });
+
+    const opening = closing - credits + debits;
+
+    return { opening, credits, debits, closing };
+  }, [accounts, filteredTransactions]);
+
+  // Enrich transactions with type and balance (simplified running balance calculation)
+  const enrichedTransactions = useMemo(() => {
+    let runningBalance = summary.opening;
+    return filteredTransactions.map(txn => {
+      const isCredit = accounts.some(acc => acc.id === txn.dest_account);
+      const isDebit = accounts.some(acc => acc.id === txn.src_account);
+      
+      let type = 'debit';
+      let description = `Transfer`;
+      
+      if (isCredit && !isDebit) {
+        type = 'credit';
+        runningBalance += txn.amount || 0;
+        const srcAcc = accountMap[txn.src_account];
+        description = `Received from ${srcAcc ? srcAcc.account_number : 'Account'}`;
+      } else if (isDebit && !isCredit) {
+        type = 'debit';
+        runningBalance -= txn.amount || 0;
+        const destAcc = accountMap[txn.dest_account];
+        description = `Sent to ${destAcc ? destAcc.account_number : 'Account'}`;
+      } else {
+        // Internal transfer
+        type = 'transfer';
+        description = 'Internal Transfer';
+      }
+
+      return {
+        ...txn,
+        type,
+        description,
+        balance: runningBalance,
+        category: txn.status === 'SUCCESS' ? 'Transfer' : txn.status,
+      };
+    });
+  }, [filteredTransactions, accounts, accountMap, summary.opening]);
+
+  const displayTransactions = enrichedTransactions;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -26,23 +142,7 @@ const AccountStatements = () => {
 
         {/* Filters */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg mb-6">
-          <div className="grid md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Account
-              </label>
-              <select
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Accounts</option>
-                <option value="savings">Savings Account (****4829)</option>
-                <option value="current">Current Account (****8192)</option>
-                <option value="credit">Credit Card (****3476)</option>
-              </select>
-            </div>
-
+          <div className="grid md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Period
@@ -57,7 +157,6 @@ const AccountStatements = () => {
                 <option value="last3Months">Last 3 Months</option>
                 <option value="last6Months">Last 6 Months</option>
                 <option value="thisYear">This Year</option>
-                <option value="custom">Custom Range</option>
               </select>
             </div>
 
@@ -77,7 +176,7 @@ const AccountStatements = () => {
               <span className="text-sm text-gray-500 dark:text-gray-400">Opening Balance</span>
               <span className="material-symbols-outlined text-blue-600 dark:text-blue-400">account_balance</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">$7,207.49</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">${summary.opening.toFixed(2)}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
@@ -85,7 +184,7 @@ const AccountStatements = () => {
               <span className="text-sm text-gray-500 dark:text-gray-400">Total Credits</span>
               <span className="material-symbols-outlined text-green-600 dark:text-green-400">arrow_downward</span>
             </div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">+$5,500.00</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">+${summary.credits.toFixed(2)}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
@@ -93,7 +192,7 @@ const AccountStatements = () => {
               <span className="text-sm text-gray-500 dark:text-gray-400">Total Debits</span>
               <span className="material-symbols-outlined text-red-600 dark:text-red-400">arrow_upward</span>
             </div>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">-$347.48</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">-${summary.debits.toFixed(2)}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
@@ -101,7 +200,7 @@ const AccountStatements = () => {
               <span className="text-sm text-gray-500 dark:text-gray-400">Closing Balance</span>
               <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">account_balance_wallet</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">$12,360.01</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">${summary.closing.toFixed(2)}</div>
           </div>
         </div>
 
@@ -133,10 +232,22 @@ const AccountStatements = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {transactions.map((txn) => (
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      Loading transactions...
+                    </td>
+                  </tr>
+                ) : displayTransactions.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                      No transactions found for this period.
+                    </td>
+                  </tr>
+                ) : displayTransactions.map((txn) => (
                   <tr key={txn.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {txn.date}
+                      {new Date(txn.timestamp).toLocaleDateString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -177,8 +288,7 @@ const AccountStatements = () => {
           <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700 dark:text-gray-300">
-                Showing <span className="font-medium">1</span> to <span className="font-medium">8</span> of{' '}
-                <span className="font-medium">142</span> transactions
+                Showing <span className="font-medium">{displayTransactions.length}</span> transaction{displayTransactions.length !== 1 ? 's' : ''}
               </div>
               <div className="flex space-x-2">
                 <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
