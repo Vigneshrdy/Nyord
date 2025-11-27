@@ -11,6 +11,7 @@ from .routers import cards_router
 import threading
 import asyncio
 from .rabbitmq_ws_listener import rabbitmq_ws_listener
+from . import config
 
 
 
@@ -20,10 +21,11 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-# CORS Configuration
+# Dynamic CORS configuration driven by environment variables to avoid hardcoding.
+_cors_origins = config.get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],  # Vite dev server
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
