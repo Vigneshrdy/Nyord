@@ -253,10 +253,10 @@ const Dashboard = () => {
                   <span className="font-medium text-gray-900 dark:text-white">Transfer Money</span>
                 </button>
              
-                <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-                  <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span>
-                  <span className="font-medium text-gray-900 dark:text-white">Pay Bills</span>
-                </button>
+                {/* <button className="w-full flex items-center space-x-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
+                  {/* <span className="material-symbols-outlined text-purple-600 dark:text-purple-400">credit_card</span> */}
+                  {/* <span className="font-medium text-gray-900 dark:text-white">Pay Bills</span> */}
+                {/* </button> */} 
               </div>
             </div>
           </div>
