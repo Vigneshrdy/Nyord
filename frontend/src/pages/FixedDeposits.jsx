@@ -150,7 +150,7 @@ const FixedDeposits = () => {
                           <div className="font-semibold text-green-600 dark:text-green-400">{fd.rate}% p.a.</div>
                         </div>
                         <div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Start Date</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Maturity Date</div>
                           <div className="font-semibold text-gray-900 dark:text-white">{fd.start_date}</div>
                         </div>
                         <div>
@@ -220,7 +220,7 @@ const FixedDeposits = () => {
                   <input type="number" value={form.tenure_months} onChange={(e)=>setForm({...form, tenure_months: e.target.value})} className="w-full px-3 py-2 rounded-lg border" />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Maturity Date</label>
                   <input type="date" value={form.start_date} onChange={(e)=>setForm({...form, start_date: e.target.value})} className="w-full px-3 py-2 rounded-lg border" />
                 </div>
                 <div className="flex justify-end">
