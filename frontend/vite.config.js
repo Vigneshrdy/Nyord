@@ -12,6 +12,6 @@ export default defineConfig({
   server: {
     host: true,
     strictPort: true,
-    allowedHosts: true   // ⬅ unlocks ngrok / all external hosts
+    allowedHosts: true   
   },
 })
