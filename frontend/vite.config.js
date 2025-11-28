@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     host: true,
     strictPort: true,
-    allowedHosts: true   
+    allowedHosts: true   //for ngrok
+
   },
 })
