@@ -4,8 +4,7 @@ import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
-import SignIn from './pages/SignIn';
-import SignUp from './pages/SignUp';
+import AuthContainer from './components/AuthContainer';
 import ForgotPassword from './pages/ForgotPassword';
 import ManageCards from './pages/ManageCards';
 import AccountStatements from './pages/AccountStatements';
@@ -23,8 +22,8 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/signup" element={<SignUp />} />
+            <Route path="/signin" element={<AuthContainer />} />
+            <Route path="/signup" element={<AuthContainer />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             
             {/* Protected Routes */}
