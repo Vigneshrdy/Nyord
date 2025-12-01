@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const SignUp = () => {
+const SignUpForm = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
@@ -127,7 +127,7 @@ const SignUp = () => {
           <div className="space-y-5">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h3>
             
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">person</span>
@@ -142,7 +142,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">mail</span>
@@ -157,7 +157,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">lock</span>
@@ -172,7 +172,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">lock</span>
@@ -187,7 +187,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Account Type</label>
               <select
                 value={formData.account_type}
@@ -206,7 +206,7 @@ const SignUp = () => {
           <div className="space-y-5">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Personal Information</h3>
             
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name *</label>
               <input
                 type="text"
@@ -219,7 +219,7 @@ const SignUp = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Phone Number *</label>
                 <input
                   type="tel"
@@ -231,7 +231,7 @@ const SignUp = () => {
                 />
               </div>
 
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Date of Birth *</label>
                 <input
                   type="date"
@@ -243,7 +243,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Address *</label>
               <textarea
                 value={formData.address}
@@ -256,7 +256,7 @@ const SignUp = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Nationality *</label>
                 <input
                   type="text"
@@ -268,7 +268,7 @@ const SignUp = () => {
                 />
               </div>
 
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Marital Status</label>
                 <select
                   value={formData.marital_status}
@@ -292,7 +292,7 @@ const SignUp = () => {
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Identification & Employment</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">ID Type *</label>
                 <select
                   value={formData.id_type}
@@ -306,7 +306,7 @@ const SignUp = () => {
                 </select>
               </div>
 
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Government ID Number *</label>
                 <input
                   type="text"
@@ -319,7 +319,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Occupation *</label>
               <input
                 type="text"
@@ -332,7 +332,7 @@ const SignUp = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Employment Type</label>
                 <select
                   value={formData.employment_type}
@@ -348,7 +348,7 @@ const SignUp = () => {
                 </select>
               </div>
 
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Annual Income (USD) *</label>
                 <input
                   type="number"
@@ -362,7 +362,7 @@ const SignUp = () => {
               </div>
             </div>
 
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Employer Name</label>
               <input
                 type="text"
@@ -380,7 +380,7 @@ const SignUp = () => {
           <div className="space-y-5">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Emergency Contact</h3>
             
-            <div>
+            <div className="stagger-item">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Emergency Contact Name *</label>
               <input
                 type="text"
@@ -393,7 +393,7 @@ const SignUp = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Emergency Contact Phone *</label>
                 <input
                   type="tel"
@@ -405,7 +405,7 @@ const SignUp = () => {
                 />
               </div>
 
-              <div>
+              <div className="stagger-item">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Relationship *</label>
                 <input
                   type="text"
@@ -433,15 +433,15 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex form-slide-up">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 relative overflow-hidden gradient-bg">
         <div className="absolute inset-0 bg-gradient-to-br from-black/20 to-transparent"></div>
         
         {/* Floating Elements */}
-        <div className="absolute top-32 left-16 w-28 h-28 bg-white/10 rounded-full blur-xl"></div>
-        <div className="absolute top-20 right-24 w-36 h-36 bg-white/5 rounded-full blur-lg"></div>
-        <div className="absolute bottom-40 left-20 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+        <div className="absolute top-32 left-16 w-28 h-28 bg-white/10 rounded-full blur-xl float"></div>
+        <div className="absolute top-20 right-24 w-36 h-36 bg-white/5 rounded-full blur-lg float" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute bottom-40 left-20 w-32 h-32 bg-white/10 rounded-full blur-2xl float" style={{ animationDelay: '4s' }}></div>
         
         <div className="relative z-10 flex flex-col justify-center items-center text-white px-12 w-full">
           {/* Logo */}
@@ -499,9 +499,9 @@ const SignUp = () => {
       
       {/* Right Side - Registration Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gray-50 overflow-y-auto">
-        <div className="max-w-md w-full">
+        <div className="max-w-md w-full fade-in">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-8">
+          <div className="lg:hidden text-center mb-8 stagger-item">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-2xl mb-4">
               <span className="text-white text-2xl font-bold">N</span>
             </div>
@@ -509,7 +509,7 @@ const SignUp = () => {
           </div>
           
           {/* Form Header */}
-          <div className="mb-8">
+          <div className="mb-8 stagger-item">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">KYC Registration</h2>
             <p className="text-gray-600">Complete your profile for account verification</p>
           </div>
@@ -543,7 +543,7 @@ const SignUp = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 focus:ring-4 focus:ring-purple-200 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed ${currentStep === 1 ? 'ml-auto' : ''}`}
+                  className={`px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 focus:ring-4 focus:ring-purple-200 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed btn-hover-scale stagger-item ${currentStep === 1 ? 'ml-auto' : ''}`}
                 >
                   {loading ? (
                     <div className="flex items-center">
@@ -576,4 +576,4 @@ const SignUp = () => {
   );
 };
 
-export default SignUp;
+export default SignUpForm;

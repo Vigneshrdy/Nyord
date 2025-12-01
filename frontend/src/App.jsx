@@ -13,6 +13,7 @@ import FixedDeposits from './pages/FixedDeposits';
 import Profile from './pages/Profile';
 import Help from './pages/Help';
 import Transfer from './pages/Transfer';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -65,6 +66,11 @@ function App() {
             <Route path="/help" element={
               <ProtectedRoute>
                 <Help />
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             } />
           </Routes>

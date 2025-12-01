@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://142.93.208.27:8000';
+const API_BASE_URL = 'http://localhost:8000';
 
 // Get token from localStorage
 const getToken = () => localStorage.getItem('token');
@@ -231,4 +231,95 @@ export const dashboardAPI = {
   },
 };
 
-export { getToken, setToken, removeToken };
+// Admin API
+export const adminAPI = {
+  setupAdmin: async () => {
+    return await apiRequest('/admin/setup-admin', { method: 'POST' });
+  },
+  getStats: async () => {
+    return await apiRequest('/admin/stats');
+  },
+  getUsers: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/users?skip=${skip}&limit=${limit}`);
+  },
+  getAllUsers: async () => {
+    return await apiRequest('/admin/users?skip=0&limit=1000');
+  },
+  getTransactions: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/transactions?skip=${skip}&limit=${limit}`);
+  },
+  getAccounts: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/accounts?skip=${skip}&limit=${limit}`);
+  },
+  createUser: async (userData) => {
+    return await apiRequest('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  },
+  updateUser: async (userId, userData) => {
+    return await apiRequest(`/admin/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    });
+  },
+  deleteUser: async (userId) => {
+    return await apiRequest(`/admin/users/${userId}`, { method: 'DELETE' });
+  },
+  adjustBalance: async (accountId, amount, reason) => {
+    return await apiRequest(`/admin/accounts/${accountId}/adjust-balance`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, reason }),
+    });
+  },
+  
+  // KYC Approval APIs
+  getPendingUsers: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/pending-users?skip=${skip}&limit=${limit}`);
+  },
+  
+  approveKYC: async (userId, action, reason = null) => {
+    return await apiRequest('/admin/approve-kyc', {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, action, reason }),
+    });
+  },
+  
+  // Cards Approval APIs
+  getPendingCards: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/pending-cards?skip=${skip}&limit=${limit}`);
+  },
+  
+  approveCard: async (cardId, action, reason = null) => {
+    return await apiRequest('/admin/approve-card', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: cardId, action, reason }),
+    });
+  },
+  
+  // Loans Approval APIs
+  getPendingLoans: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/pending-loans?skip=${skip}&limit=${limit}`);
+  },
+  
+  approveLoan: async (loanId, action, reason = null) => {
+    return await apiRequest('/admin/approve-loan', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: loanId, action, reason }),
+    });
+  },
+  
+  // Fixed Deposits Approval APIs
+  getPendingFixedDeposits: async (skip = 0, limit = 100) => {
+    return await apiRequest(`/admin/pending-fixed-deposits?skip=${skip}&limit=${limit}`);
+  },
+  
+  approveFixedDeposit: async (fdId, action, reason = null) => {
+    return await apiRequest('/admin/approve-fixed-deposit', {
+      method: 'POST',
+      body: JSON.stringify({ item_id: fdId, action, reason }),
+    });
+  },
+};
+
+export { getToken, setToken, removeToken, apiRequest };

@@ -10,6 +10,7 @@ from .routers import loans_router
 from .routers import cards_router
 from .routers import dashboard_router
 from .routers import users_router
+from .routers import admin_router
 import threading
 import asyncio
 from .rabbitmq_ws_listener import rabbitmq_ws_listener
@@ -43,6 +44,7 @@ app.include_router(loans_router.router)
 app.include_router(cards_router.router)
 app.include_router(dashboard_router.router)
 app.include_router(users_router.router)
+app.include_router(admin_router.router)
 
 @app.on_event("startup")
 def start_ws_listener():

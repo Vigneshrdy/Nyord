@@ -190,11 +190,12 @@ function UserProfileDropdown({ align = "end", sizeClass = "h-8 w-8" }) {
 }
 
 // Main Navbar Component
-const navigationLinks = [
+const getNavigationLinks = (user) => [
   {
     name: "Menu",
     items: [
       { href: "/dashboard", label: "Dashboard" },
+      ...(user?.role === 'admin' ? [{ href: "/admin", label: "Admin Panel" }] : []),
       { href: "/cards", label: "Cards" },
       { href: "/statements", label: "Statements" },
       { href: "/loans", label: "Loans" },
@@ -209,6 +210,7 @@ export default function Navbar() {
   const location = useLocation();
   const { user } = useAuth();
   
+  const navigationLinks = getNavigationLinks(user);
   const isActive = (path) => location.pathname === path;
 
   return (

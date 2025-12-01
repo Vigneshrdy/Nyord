@@ -1,5 +1,6 @@
 # JWT connection 
-from passlib.context import CryptContext
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import os
@@ -10,7 +11,6 @@ from sqlalchemy.orm import Session
 
 load_dotenv()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
 SECRET_KEY = os.getenv("JWT_SECRET")
 ALGORITHM = os.getenv("JWT_ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
@@ -18,17 +18,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 security = HTTPBearer()
 
 def hash_password(password: str):
-    # Ensure password length within bcrypt limit (72 bytes)
-    if isinstance(password, str):
-        password = password.encode('utf-8')
-    truncated = password[:72]
-    return pwd_context.hash(truncated)
+    # Use SHA-256 with salt as a temporary workaround for bcrypt issues
+    salt = secrets.token_hex(16)
+    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
+    return f"{salt}:{password_hash}"
 
 def verify_password(plain, hashed):
-    if isinstance(plain, str):
-        plain = plain.encode('utf-8')
-    truncated = plain[:72]
-    return pwd_context.verify(truncated, hashed)
+    # Verify SHA-256 hashed password
+    try:
+        salt, password_hash = hashed.split(':')
+        return hashlib.sha256((plain + salt).encode()).hexdigest() == password_hash
+    except ValueError:
+        return False
 
 def create_access_token(data: dict):
     to_encode = data.copy()
@@ -42,6 +43,22 @@ def decode_access_token(token: str):
         return payload
     except JWTError:
         return None
+
+def verify_access_token(token: str):
+    """Verify and decode access token"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+def get_token_from_header(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Extract token from Authorization header"""
+    return credentials.credentials
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     from . import models

@@ -1,17 +1,52 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, Union
 
 # ------------------ USER -------------------
 class UserCreate(BaseModel):
+    # Basic account info
     username: str
     email: str
     password: str
-    full_name: Optional[str] = None
-    phone: Optional[str] = None
-    date_of_birth: Optional[date] = None
-    address: Optional[str] = None
+    role: str = "customer"  # 'customer', 'admin'
     account_type: str = "savings"  # 'savings' or 'current'
+    
+    # Personal information (required for KYC)
+    full_name: str
+    phone: str
+    date_of_birth: Optional[Union[date, str]] = None
+    address: str
+    nationality: str
+    
+    # Government ID information (required for KYC)
+    government_id: str
+    id_type: str = "passport"  # 'passport', 'national_id', 'driving_license', 'other'
+    
+    # Employment information (required for KYC)
+    occupation: str
+    annual_income: Optional[Union[float, str]] = None
+    employer_name: Optional[str] = None
+    employment_type: str = "employed"  # 'employed', 'self_employed', 'unemployed', 'student', 'retired', 'other'
+    
+    # Personal details (required for KYC)
+    marital_status: str = "single"  # 'single', 'married', 'divorced', 'widowed', 'other'
+    
+    # Emergency contact (required for KYC)
+    emergency_contact_name: str
+    emergency_contact_phone: str
+    emergency_contact_relation: str
+
+    @validator('date_of_birth', pre=True)
+    def validate_date_of_birth(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+    
+    @validator('annual_income', pre=True)
+    def validate_annual_income(cls, v):
+        if v == "" or v is None:
+            return None
+        return float(v)
 
 class UserLogin(BaseModel):
     username: str
@@ -21,10 +56,24 @@ class UserOut(BaseModel):
     id: int
     username: str
     email: str
+    role: str
+    status: str  # 'pending', 'approved', 'rejected', 'suspended'
+    kyc_approved: bool
     full_name: Optional[str] = None
     phone: Optional[str] = None
     date_of_birth: Optional[date] = None
     address: Optional[str] = None
+    nationality: Optional[str] = None
+    government_id: Optional[str] = None
+    id_type: Optional[str] = None
+    occupation: Optional[str] = None
+    annual_income: Optional[float] = None
+    employer_name: Optional[str] = None
+    employment_type: Optional[str] = None
+    marital_status: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    emergency_contact_relation: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -97,6 +146,7 @@ class FixedDepositOut(BaseModel):
     maturity_date: date
     tenure_months: int
     status: str
+    approval_status: str
     maturity_amount: Optional[float] = None
 
     class Config:
@@ -127,6 +177,7 @@ class LoanOut(BaseModel):
     outstanding: float
     next_due_date: Optional[date]
     status: str
+    approval_status: str
     account_ref: Optional[str] = None
 
     class Config:
@@ -155,6 +206,7 @@ class CardOut(BaseModel):
     credit_limit: float
     available_credit: float
     status: str
+    approval_status: str
     issued_date: Optional[date]
     gradient_colors: Optional[str]
 
@@ -187,3 +239,66 @@ class CardChangePinRequest(BaseModel):
                 if key in values:
                     values[key] = cls._validate_pin_value(values[key])
         return values
+
+
+# ------------------ ADMIN -------------------
+class AdminCreateUser(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: str = "customer"
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+    account_type: str = "savings"
+    initial_balance: float = 10000.0
+
+
+class AdminUserUpdate(BaseModel):
+    role: Optional[str] = None
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    address: Optional[str] = None
+
+
+class AdminStats(BaseModel):
+    total_users: int
+    total_accounts: int
+    total_balance: float
+    total_transactions: int
+    total_loans: int
+    total_fixed_deposits: int
+    total_cards: int
+    pending_kyc: int
+    pending_cards: int
+    pending_loans: int
+    pending_fds: int
+
+
+# Approval schemas
+class ApprovalRequest(BaseModel):
+    item_id: int
+    action: str  # 'approve' or 'reject'
+    reason: Optional[str] = None
+
+
+class ApprovalNotificationOut(BaseModel):
+    id: int
+    user_id: int
+    request_type: str
+    request_id: Optional[int]
+    status: str
+    message: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class KYCApprovalRequest(BaseModel):
+    user_id: int
+    action: str  # 'approve' or 'reject'
+    reason: Optional[str] = None
