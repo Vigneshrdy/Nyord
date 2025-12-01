@@ -46,7 +46,7 @@ const Loans = () => {
     fetchUser();
 
     // WebSocket live updates
-    const ws = new WebSocket('ws://142.93.208.27:8000/ws');
+    const ws = new WebSocket('ws://taksari.me/ws');
     ws.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data);
