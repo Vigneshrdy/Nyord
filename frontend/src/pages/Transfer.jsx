@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { accountsAPI, transactionsAPI } from '../services/api';
+import { accountsAPI, transactionsAPI, cardsAPI } from '../services/api';
 
 const Transfer = () => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
+  const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -12,16 +13,20 @@ const Transfer = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   
   const [transferData, setTransferData] = useState({
+    sourceType: 'account', // 'account' or 'card'
     sourceAccount: '',
+    sourceCard: '',
     recipientUser: null,
     recipientAccount: null,
     amount: '',
+    cardPin: '', // Required for card transfers
   });
 
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     fetchAccounts();
+    fetchCards();
   }, []);
 
   const fetchAccounts = async () => {
@@ -29,6 +34,17 @@ const Transfer = () => {
       const data = await accountsAPI.getAccounts();
       console.log('Fetched accounts:', data);
       setAccounts(data || []);
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    }
+  };
+
+  const fetchCards = async () => {
+    try {
+      const data = await cardsAPI.getMyCards();
+      console.log('Fetched cards:', data);
+      // Only show active cards for transfers
+      setCards(data?.filter(card => card.status === 'ACTIVE') || []);
       // Don't auto-select to force user to choose
     } catch (e) {
       console.error('Failed to fetch accounts', e);
@@ -91,39 +107,74 @@ const Transfer = () => {
   const handleTransfer = async (e) => {
     e.preventDefault();
 
-    if (!transferData.sourceAccount || !transferData.recipientAccount || !transferData.amount) {
-      showMessage('error', 'Please fill all fields');
-      return;
-    }
-
     const amount = parseFloat(transferData.amount);
     if (isNaN(amount) || amount <= 0) {
       showMessage('error', 'Please enter a valid amount');
       return;
     }
 
+    if (!transferData.recipientAccount) {
+      showMessage('error', 'Please select a recipient');
+      return;
+    }
+
+    // Validate source selection
+    if (transferData.sourceType === 'account' && !transferData.sourceAccount) {
+      showMessage('error', 'Please select a source account');
+      return;
+    }
+
+    if (transferData.sourceType === 'card') {
+      if (!transferData.sourceCard) {
+        showMessage('error', 'Please select a source card');
+        return;
+      }
+      if (!transferData.cardPin || transferData.cardPin.length !== 4) {
+        showMessage('error', 'Please enter a valid 4-digit PIN');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
-      await transactionsAPI.createTransaction({
-        src_account: parseInt(transferData.sourceAccount),
-        dest_account: parseInt(transferData.recipientAccount),
-        amount: amount,
-      });
-
-      showMessage('success', 'Transfer initiated successfully!');
+      if (transferData.sourceType === 'card') {
+        // Card to account transfer
+        await cardsAPI.transferFromCard(parseInt(transferData.sourceCard), {
+          dest_account: parseInt(transferData.recipientAccount),
+          amount: amount,
+          pin: transferData.cardPin,
+        });
+        showMessage('success', 'Card transfer completed successfully!');
+      } else {
+        // Account to account transfer
+        await transactionsAPI.createTransaction({
+          src_account: parseInt(transferData.sourceAccount),
+          dest_account: parseInt(transferData.recipientAccount),
+          amount: amount,
+        });
+        showMessage('success', 'Transfer initiated successfully!');
+      }
       
       // Reset form
       setTransferData({
+        sourceType: 'account',
         sourceAccount: accounts[0]?.id || '',
+        sourceCard: '',
         recipientUser: null,
         recipientAccount: null,
         amount: '',
+        cardPin: '',
       });
       setSearchQuery('');
       
-      // Refresh accounts to show updated balance
-      setTimeout(() => fetchAccounts(), 2000);
+      // Refresh data
+      setTimeout(() => {
+        fetchAccounts();
+        if (transferData.sourceType === 'card') {
+          fetchCards();
+        }
+      }, 2000);
     } catch (e) {
       console.error('Transfer failed', e);
       showMessage('error', e.message || 'Transfer failed. Please try again.');
@@ -169,14 +220,44 @@ const Transfer = () => {
         {/* Transfer Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg">
           <form onSubmit={handleTransfer} className="space-y-6">
-            {/* Source Account */}
+            {/* Source Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                From Account
+                Transfer From
               </label>
-              <select
-                value={transferData.sourceAccount}
-                onChange={(e) => setTransferData({ ...transferData, sourceAccount: e.target.value })}
+              <div className="flex space-x-4 mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="account"
+                    checked={transferData.sourceType === 'account'}
+                    onChange={(e) => setTransferData({ ...transferData, sourceType: e.target.value, sourceCard: '', cardPin: '' })}
+                    className="mr-2"
+                  />
+                  Bank Account
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="card"
+                    checked={transferData.sourceType === 'card'}
+                    onChange={(e) => setTransferData({ ...transferData, sourceType: e.target.value, sourceAccount: '' })}
+                    className="mr-2"
+                  />
+                  Credit Card
+                </label>
+              </div>
+            </div>
+
+            {/* Source Account/Card Selection */}
+            {transferData.sourceType === 'account' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  From Account
+                </label>
+                <select
+                  value={transferData.sourceAccount}
+                  onChange={(e) => setTransferData({ ...transferData, sourceAccount: e.target.value })}
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               >
@@ -193,6 +274,42 @@ const Transfer = () => {
                 </p>
               )}
             </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  From Credit Card
+                </label>
+                <select
+                  value={transferData.sourceCard}
+                  onChange={(e) => setTransferData({ ...transferData, sourceCard: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Select a card</option>
+                  {cards.map(card => (
+                    <option key={card.id} value={String(card.id)}>
+                      {card.card_type} - {card.card_number} - Available Credit: ${card.available_credit.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </option>
+                  ))}
+                </select>
+                {transferData.sourceCard && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Card PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength="4"
+                      value={transferData.cardPin}
+                      onChange={(e) => setTransferData({ ...transferData, cardPin: e.target.value.replace(/\D/g, '') })}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter 4-digit PIN"
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Recipient Search */}
             <div className="relative">

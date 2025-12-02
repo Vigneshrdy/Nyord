@@ -24,6 +24,19 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+
+    // Listen for balance updates from WebSocket
+    const handleBalanceUpdate = (event) => {
+      console.log('Balance update received:', event.detail);
+      // Refresh dashboard data when balance changes
+      fetchDashboardData();
+    };
+
+    window.addEventListener('balanceUpdate', handleBalanceUpdate);
+
+    return () => {
+      window.removeEventListener('balanceUpdate', handleBalanceUpdate);
+    };
   }, []);
 
   if (loading) {

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
+import { useNotifications } from '../contexts/NotificationApiContext';
 
 const KYCApprovalDashboard = () => {
+  const { showSuccess, showError } = useNotifications();
   const [pendingApplications, setPendingApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,7 +39,10 @@ const KYCApprovalDashboard = () => {
       setPendingApplications(prev => prev.filter(app => app.id !== userId));
       
       // Show success message
-      alert(`KYC application has been ${action}d successfully!`);
+      showSuccess(
+        'KYC Application Updated',
+        `KYC application has been ${action}d successfully!`
+      );
       
     } catch (err) {
       setError(`Failed to ${approve ? 'approve' : 'reject'} application`);

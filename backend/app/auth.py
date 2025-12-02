@@ -20,6 +20,21 @@ def get_current_user(token: str = Depends(utils.get_token_from_header), db: Sess
     return user
 
 
+def get_current_user_from_token(token: str, db: Session):
+    """Get current user from raw token (for WebSocket authentication)"""
+    payload = utils.verify_access_token(token)
+    user_id = payload.get("user_id")
+    
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user
+
+
 def get_admin_user(current_user: models.User = Depends(get_current_user)):
     """Verify current user is an admin"""
     if current_user.role != "admin":

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
+import { useNotifications } from '../contexts/NotificationApiContext';
 
 const LoanApprovalDashboard = () => {
+  const { showSuccess, showError } = useNotifications();
   const [pendingLoans, setPendingLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,7 +39,10 @@ const LoanApprovalDashboard = () => {
       setPendingLoans(prev => prev.filter(loan => loan.id !== loanId));
       
       // Show success message
-      alert(`Loan application has been ${action}d successfully!${approve ? ' The loan amount will be credited to the user\'s account.' : ''}`);
+      showSuccess(
+        'Loan Application Updated',
+        `Loan application has been ${action}d successfully!${approve ? ' The loan amount will be credited to the user\'s account.' : ''}`
+      );
       
     } catch (err) {
       setError(`Failed to ${approve ? 'approve' : 'reject'} loan application`);

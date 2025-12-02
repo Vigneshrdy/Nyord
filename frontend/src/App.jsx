@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationApiContext';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
@@ -14,13 +15,15 @@ import Profile from './pages/Profile';
 import Help from './pages/Help';
 import Transfer from './pages/Transfer';
 import AdminDashboard from './pages/AdminDashboard';
+import Notifications from './pages/Notifications';
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen bg-white dark:bg-gray-900">
-          <Navbar />
+        <NotificationProvider>
+          <div className="min-h-screen bg-white dark:bg-gray-900">
+            <Navbar />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/signin" element={<AuthContainer />} />
@@ -73,8 +76,14 @@ function App() {
                 <AdminDashboard />
               </ProtectedRoute>
             } />
+            <Route path="/notifications" element={
+              <ProtectedRoute>
+                <Notifications />
+              </ProtectedRoute>
+            } />
           </Routes>
-        </div>
+          </div>
+        </NotificationProvider>
       </AuthProvider>
     </Router>
   );

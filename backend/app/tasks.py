@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 
 # App imports
 from .celery_app import celery_app
-from .models import Transaction, Account, AuditLog
+from .models import Transaction, Account, AuditLog, User, Notification
 from app.websocket_manager import manager
 
 import pika
@@ -91,7 +91,94 @@ def process_transaction(event_payload: dict):
             message=f"Txn {txn_id}: {amount} transferred from {src_id} to {dest_id}"
         ))
 
+        # Create notifications for both sender and receiver
+        # Get user information
+        src_user = db.query(User).filter(User.id == src_acc.user_id).first()
+        dest_user = db.query(User).filter(User.id == dest_acc.user_id).first()
+
+        sender_notification = None
+        receiver_notification = None
+
+        if src_user:
+            # Notification for sender
+            sender_notification = Notification(
+                user_id=src_user.id,
+                title="Transaction Sent",
+                message=f"You successfully sent ${amount:,.2f} to {dest_user.username if dest_user else 'Account ' + str(dest_id)}. Your new balance is ${src_acc.balance:,.2f}.",
+                type="transaction",
+                related_id=txn_id
+            )
+            db.add(sender_notification)
+            print(f"Created sender notification for user {src_user.id}")
+
+        if dest_user and (not src_user or dest_user.id != src_user.id):
+            # Notification for receiver (only if different from sender)
+            receiver_notification = Notification(
+                user_id=dest_user.id,
+                title="Transaction Received",
+                message=f"You received ${amount:,.2f} from {src_user.username if src_user else 'Account ' + str(src_id)}. Your new balance is ${dest_acc.balance:,.2f}.",
+                type="transaction",
+                related_id=txn_id,
+                from_user_id=src_user.id if src_user else None
+            )
+            db.add(receiver_notification)
+            print(f"Created receiver notification for user {dest_user.id}")
+
         db.commit()
+        print(f"Notifications committed to database for transaction {txn_id}")
+        
+        # Send real-time notifications via WebSocket
+        if sender_notification and src_user:
+            try:
+                print(f"Sending WebSocket notification to sender user {src_user.id}")
+                asyncio.run(manager.send_personal_message(
+                    message={
+                        "type": "notification",
+                        "data": {
+                            "id": sender_notification.id,
+                            "user_id": sender_notification.user_id,
+                            "title": sender_notification.title,
+                            "message": sender_notification.message,
+                            "type": sender_notification.type,
+                            "related_id": sender_notification.related_id,
+                            "is_read": False,
+                            "created_at": sender_notification.created_at.isoformat(),
+                            "read_at": None,
+                            "from_user_id": None,
+                            "from_user_name": None
+                        }
+                    },
+                    user_id=src_user.id
+                ))
+                print(f"WebSocket notification sent to sender user {src_user.id}")
+            except Exception as e:
+                print(f"Failed to send real-time notification to sender: {e}")
+
+        if receiver_notification and dest_user and (not src_user or dest_user.id != src_user.id):
+            try:
+                print(f"Sending WebSocket notification to receiver user {dest_user.id}")
+                asyncio.run(manager.send_personal_message(
+                    message={
+                        "type": "notification",
+                        "data": {
+                            "id": receiver_notification.id,
+                            "user_id": receiver_notification.user_id,
+                            "title": receiver_notification.title,
+                            "message": receiver_notification.message,
+                            "type": receiver_notification.type,
+                            "related_id": receiver_notification.related_id,
+                            "is_read": False,
+                            "created_at": receiver_notification.created_at.isoformat(),
+                            "read_at": None,
+                            "from_user_id": receiver_notification.from_user_id,
+                            "from_user_name": src_user.username if src_user else None
+                        }
+                    },
+                    user_id=dest_user.id
+                ))
+                print(f"WebSocket notification sent to receiver user {dest_user.id}")
+            except Exception as e:
+                print(f"Failed to send real-time notification to receiver: {e}")
         
         print(f"Processed transaction {txn_id}: SUCCESS")
         # --- Publish SUCCESS event to RabbitMQ ---

@@ -65,10 +65,18 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     status = Column(String, default="PENDING")  # PENDING, SUCCESS, FAILED
     timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    # Card-based transaction support - UNCOMMENT AFTER RUNNING fix_transactions_table.sql
+    # src_card_id = Column(Integer, ForeignKey("cards.id"), nullable=True)  # Source card for card-to-account transfers
+    # dest_card_id = Column(Integer, ForeignKey("cards.id"), nullable=True)  # Destination card for account-to-card transfers
+    # transaction_type = Column(String, default="account_to_account")  # account_to_account, card_to_account, account_to_card, card_to_card
 
     # relationships (not mandatory but useful)
     src_acc_rel = relationship("Account", foreign_keys=[src_account])
     dest_acc_rel = relationship("Account", foreign_keys=[dest_account])
+    # UNCOMMENT AFTER RUNNING fix_transactions_table.sql:
+    # src_card_rel = relationship("Card", foreign_keys=[src_card_id])
+    # dest_card_rel = relationship("Card", foreign_keys=[dest_card_id])
 
 
 class AuditLog(Base):
@@ -168,3 +176,23 @@ class ApprovalNotification(Base):
     message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String, nullable=False)  # 'loan_request', 'card_request', 'transaction', 'approval', 'rejection', 'general'
+    related_id = Column(Integer, nullable=True)  # ID of related entity (loan_id, card_id, transaction_id)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    read_at = Column(DateTime, nullable=True)
+    
+    # For admin notifications
+    from_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    user = relationship("User", foreign_keys=[user_id])
+    from_user = relationship("User", foreign_keys=[from_user_id])

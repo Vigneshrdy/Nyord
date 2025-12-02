@@ -222,6 +222,12 @@ export const cardsAPI = {
       body: JSON.stringify({ current_pin: currentPin, new_pin: newPin }),
     });
   },
+  transferFromCard: async (cardId, transferData) => {
+    return await apiRequest(`/cards/${cardId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify(transferData),
+    });
+  },
 };
 
 // Dashboard API

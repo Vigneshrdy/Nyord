@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from ..database import get_db
 from ..models import Card, User
-from ..schemas import CardCreate, CardOut, CardBlockRequest, CardChangePinRequest
+from ..schemas import CardCreate, CardOut, CardBlockRequest, CardChangePinRequest, NotificationCreate
 from ..utils import get_current_user, hash_password, verify_password
+from .notification_router import create_notification_service
 import random
 from dateutil.relativedelta import relativedelta
 
@@ -49,7 +50,7 @@ def list_my_cards(current_user: User = Depends(get_current_user), db: Session = 
 
 
 @router.post("/", response_model=CardOut, status_code=status.HTTP_201_CREATED)
-def request_card(
+async def request_card(
     card_data: CardCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -81,7 +82,7 @@ def request_card(
     # Hash the PIN
     hashed_pin = hash_password(card_data.pin)
     
-    # Create card with ACTIVE status (or PENDING if you want approval workflow)
+    # Create card with PENDING status for approval workflow
     new_card = Card(
         user_id=current_user.id,
         card_number=card_number,
@@ -91,8 +92,8 @@ def request_card(
         cvv=cvv,
         pin=hashed_pin,
         credit_limit=credit_limit,
-        available_credit=credit_limit,  # Initially full credit available
-        status="ACTIVE",
+        available_credit=0.0,  # No credit until approved
+        status="PENDING",
         issued_date=date.today(),
         gradient_colors=gradient,
     )
@@ -100,6 +101,30 @@ def request_card(
     db.add(new_card)
     db.commit()
     db.refresh(new_card)
+    
+    # Create notifications
+    # 1. Notification for user
+    user_notification = NotificationCreate(
+        user_id=current_user.id,
+        title="Card Application Submitted",
+        message=f"Your {card_data.card_type} card application has been submitted successfully. It is currently pending approval. You will be notified once it's reviewed.",
+        type="card_request",
+        related_id=new_card.id
+    )
+    await create_notification_service(db, user_notification)
+    
+    # 2. Notification for admins
+    admins = db.query(User).filter(User.role == "admin").all()
+    for admin in admins:
+        admin_notification = NotificationCreate(
+            user_id=admin.id,
+            title="New Card Application",
+            message=f"{current_user.username} has applied for a {card_data.card_type} card with requested credit limit ${credit_limit:,.2f}. Please review and approve/reject the application.",
+            type="card_request",
+            related_id=new_card.id,
+            from_user_id=current_user.id
+        )
+        await create_notification_service(db, admin_notification)
     
     return new_card
 
@@ -230,6 +255,82 @@ def unblock_card(
     db.refresh(card)
     
     return card
+
+
+@router.post("/{card_id}/transfer")
+async def card_transfer(
+    card_id: int,
+    transfer_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Transfer money using card to account"""
+    # Verify card ownership and status
+    card = db.query(Card).filter(
+        Card.id == card_id,
+        Card.user_id == current_user.id,
+        Card.status == "ACTIVE"
+    ).first()
+    
+    if not card:
+        raise HTTPException(status_code=404, detail="Active card not found")
+    
+    # Verify PIN
+    if not verify_password(transfer_data.get("pin", ""), card.pin):
+        raise HTTPException(status_code=401, detail="Invalid PIN")
+    
+    # Check available credit
+    if card.available_credit < transfer_data.get("amount", 0):
+        raise HTTPException(status_code=400, detail="Insufficient credit limit")
+    
+    # For card transfers, we deduct from available credit and add to destination account
+    from ..models import Account, Transaction
+    
+    dest_acc = db.query(Account).filter(Account.id == transfer_data["dest_account"]).first()
+    if not dest_acc:
+        raise HTTPException(status_code=404, detail="Destination account not found")
+    
+    # Create transaction record
+    new_txn = Transaction(
+        src_card_id=card_id,
+        dest_account=transfer_data["dest_account"],
+        amount=transfer_data["amount"],
+        status="SUCCESS",  # Card transfers are immediate
+        transaction_type="card_to_account"
+    )
+    
+    # Update card credit and destination account balance
+    card.available_credit -= transfer_data["amount"]
+    dest_acc.balance += transfer_data["amount"]
+    
+    db.add(new_txn)
+    db.commit()
+    db.refresh(new_txn)
+    
+    # Create notifications for card transfer
+    user_notification = NotificationCreate(
+        user_id=current_user.id,
+        title="Card Transfer Sent",
+        message=f"You transferred ${transfer_data['amount']:,.2f} from your {card.card_type} card to account {transfer_data['dest_account']}. Remaining credit: ${card.available_credit:,.2f}",
+        type="transaction",
+        related_id=new_txn.id
+    )
+    await create_notification_service(db, user_notification)
+    
+    # Notification for receiver
+    dest_user = db.query(User).filter(User.id == dest_acc.user_id).first()
+    if dest_user and dest_user.id != current_user.id:
+        receiver_notification = NotificationCreate(
+            user_id=dest_user.id,
+            title="Transfer Received",
+            message=f"You received ${transfer_data['amount']:,.2f} from {current_user.username}'s card. Your new balance is ${dest_acc.balance:,.2f}.",
+            type="transaction",
+            related_id=new_txn.id,
+            from_user_id=current_user.id
+        )
+        await create_notification_service(db, receiver_notification)
+    
+    return new_txn
     
     if not card:
         raise HTTPException(status_code=404, detail="Card not found")

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationApiContext';
 import { adminAPI } from '../services/api';
 import KYCApprovalDashboard from '../components/KYCApprovalDashboard';
 import LoanApprovalDashboard from '../components/LoanApprovalDashboard';
@@ -44,9 +45,13 @@ const AdminDashboard = () => {
   const setupAdmin = async () => {
     try {
       const response = await adminAPI.setupAdmin();
-      alert(`Admin created! Username: ${response.data.username}, Password: ${response.data.password}`);
+      showSuccess(
+        'Admin Account Created!',
+        `Username: ${response.data.username}, Password: ${response.data.password}`,
+        { duration: 10000 }
+      );
     } catch (err) {
-      setError(err.message || 'Failed to setup admin');
+      showError('Setup Failed', err.message || 'Failed to setup admin');
     }
   };
 

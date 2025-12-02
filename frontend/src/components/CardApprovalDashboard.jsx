@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
+import { useNotifications } from '../contexts/NotificationApiContext';
 
 const CardApprovalDashboard = () => {
+  const { showSuccess, showError } = useNotifications();
   const [pendingCards, setPendingCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,7 +39,10 @@ const CardApprovalDashboard = () => {
       setPendingCards(prev => prev.filter(card => card.id !== cardId));
       
       // Show success message
-      alert(`Card application has been ${action}d successfully!${approve ? ' The card will be activated and available for use.' : ''}`);
+      showSuccess(
+        'Card Application Updated',
+        `Card application has been ${action}d successfully!${approve ? ' The card will be activated and available for use.' : ''}`
+      );
       
     } catch (err) {
       setError(`Failed to ${approve ? 'approve' : 'reject'} card application`);

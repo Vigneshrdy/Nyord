@@ -111,18 +111,29 @@ class Token(BaseModel):
     token_type: str
 
 class TransactionCreate(BaseModel):
-    src_account: int
-    dest_account: int
+    src_account: Optional[int] = None
+    dest_account: Optional[int] = None
     amount: float
+    
+    # Card-based transfer support
+    src_card_id: Optional[int] = None
+    dest_card_id: Optional[int] = None
+    transaction_type: str = "account_to_account"  # account_to_account, card_to_account, account_to_card, card_to_card
+    card_pin: Optional[str] = None  # Required for card-based transactions
 
 
 class TransactionOut(BaseModel):
     id: int
-    src_account: int
-    dest_account: int
+    src_account: Optional[int] = None
+    dest_account: Optional[int] = None
     amount: float
     status: str
     timestamp: datetime
+    
+    # Card-based transfer fields
+    src_card_id: Optional[int] = None
+    dest_card_id: Optional[int] = None
+    transaction_type: str = "account_to_account"
 
     class Config:
         from_attributes = True
@@ -302,3 +313,39 @@ class KYCApprovalRequest(BaseModel):
     user_id: int
     action: str  # 'approve' or 'reject'
     reason: Optional[str] = None
+
+
+# ------------------ NOTIFICATIONS -------------------
+class NotificationCreate(BaseModel):
+    user_id: int
+    title: str
+    message: str
+    type: str  # 'loan_request', 'card_request', 'transaction', 'approval', 'rejection', 'general'
+    related_id: Optional[int] = None
+    from_user_id: Optional[int] = None
+
+
+class NotificationOut(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    message: str
+    type: str
+    related_id: Optional[int] = None
+    is_read: bool
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    from_user_id: Optional[int] = None
+    from_user_name: Optional[str] = None  # We'll populate this manually
+
+    class Config:
+        from_attributes = True
+
+
+class NotificationUpdate(BaseModel):
+    is_read: bool = True
+
+
+class NotificationStats(BaseModel):
+    total_count: int
+    unread_count: int

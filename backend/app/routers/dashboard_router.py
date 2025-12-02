@@ -34,7 +34,7 @@ def get_dashboard_summary(db: Session = Depends(get_db),
             "id": acc.id,
             "account_number": acc.account_number,
             "balance": float(acc.balance),
-            "type": "savings"  # Default type, can be extended in model
+            "account_type": acc.account_type or 'savings'  # Use account_type from model or default to savings
         }
         for acc in accounts
     ]

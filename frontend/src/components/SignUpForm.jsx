@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationApiContext';
 import '../styles/auth-animations.css';
 
 const SignUpForm = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
+  const { showSuccess } = useNotifications();
   const [formData, setFormData] = useState({
     // Basic account info
     username: '',
@@ -78,7 +80,11 @@ const SignUpForm = () => {
       await register(registrationData);
       
       // Show success message for pending approval
-      alert('Registration successful! Your account is pending admin approval. You will be notified once your KYC is verified.');
+      showSuccess(
+        'Registration Successful!',
+        'Your account is pending admin approval. You will be notified once your KYC is verified.',
+        { duration: 6000 }
+      );
       navigate('/signin');
     } catch (err) {
       setError(err.message || 'Failed to create account');

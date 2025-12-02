@@ -4,6 +4,7 @@ from sqlalchemy import func
 from typing import List
 from .. import models, schemas, auth
 from ..database import get_db
+from .notification_router import create_notification_service
 import random
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -373,6 +374,28 @@ async def approve_card(
     db.commit()
     db.refresh(card)
     
+    # Create notification for user
+    if approval_request.action.lower() == "approve":
+        notification_title = "Card Application Approved"
+        notification_message = f"Congratulations! Your {card.card_type} card application has been approved and is now active with credit limit ${card.credit_limit:,.2f}."
+        notification_type = "card_approval"
+    else:
+        notification_title = "Card Application Rejected"
+        notification_message = f"Your {card.card_type} card application has been rejected. Reason: {approval_request.reason or 'No specific reason provided'}"
+        notification_type = "card_rejection"
+    
+    user_notification = schemas.NotificationCreate(
+        user_id=card.user_id,
+        title=notification_title,
+        message=notification_message,
+        type=notification_type,
+        related_id=card.id,
+        from_user_id=admin_user.id
+    )
+    
+    # Create notification after commit
+    await create_notification_service(db, user_notification)
+    
     return {
         "message": message,
         "card_id": card.id,
@@ -447,6 +470,28 @@ async def approve_loan(
     
     db.commit()
     db.refresh(loan)
+    
+    # Create notification for user
+    if approval_request.action.lower() == "approve":
+        notification_title = "Loan Application Approved"
+        notification_message = f"Congratulations! Your {loan.loan_type} loan application for ${loan.principal:,.2f} has been approved. The amount has been disbursed to your account."
+        notification_type = "loan_approval"
+    else:
+        notification_title = "Loan Application Rejected"
+        notification_message = f"Your {loan.loan_type} loan application for ${loan.principal:,.2f} has been rejected. Reason: {approval_request.reason or 'No specific reason provided'}"
+        notification_type = "loan_rejection"
+    
+    user_notification = schemas.NotificationCreate(
+        user_id=loan.user_id,
+        title=notification_title,
+        message=notification_message,
+        type=notification_type,
+        related_id=loan.id,
+        from_user_id=admin_user.id
+    )
+    
+    # Create notification after commit
+    await create_notification_service(db, user_notification)
     
     return {
         "message": message,

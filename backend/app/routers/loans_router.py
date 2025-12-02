@@ -3,8 +3,9 @@ from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from ..database import get_db
 from ..models import Loan, User
-from ..schemas import LoanCreate, LoanOut, LoanPayment
+from ..schemas import LoanCreate, LoanOut, LoanPayment, NotificationCreate
 from ..utils import get_current_user
+from .notification_router import create_notification_service
 import math
 import pika
 import json
@@ -37,7 +38,7 @@ def list_my_loans(current_user: User = Depends(get_current_user), db: Session = 
 
 
 @router.post("/", response_model=LoanOut, status_code=status.HTTP_201_CREATED)
-def apply_loan(payload: LoanCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def apply_loan(payload: LoanCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if payload.loan_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Invalid loan type")
     if payload.principal <= 0:
@@ -71,6 +72,30 @@ def apply_loan(payload: LoanCreate, current_user: User = Depends(get_current_use
     db.add(loan)
     db.commit()
     db.refresh(loan)
+
+    # Create notifications
+    # 1. Notification for user
+    user_notification = NotificationCreate(
+        user_id=current_user.id,
+        title="Loan Application Submitted",
+        message=f"Your {payload.loan_type} loan application for ${payload.principal:,.2f} has been submitted and is pending approval.",
+        type="loan_request",
+        related_id=loan.id
+    )
+    await create_notification_service(db, user_notification)
+    
+    # 2. Notification for admins
+    admins = db.query(User).filter(User.role == "admin").all()
+    for admin in admins:
+        admin_notification = NotificationCreate(
+            user_id=admin.id,
+            title="New Loan Application",
+            message=f"{current_user.username} has applied for a {payload.loan_type} loan of ${payload.principal:,.2f}",
+            type="loan_request",
+            related_id=loan.id,
+            from_user_id=current_user.id
+        )
+        await create_notification_service(db, admin_notification)
 
     _publish_ws_event({
         "type": "loan.created",
