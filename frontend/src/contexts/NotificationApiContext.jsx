@@ -29,8 +29,8 @@ export function NotificationProvider({ children }) {
 
     console.log('Fetching notifications from API');
     try {
-      // const response = await fetch('https://localhost:8000/api/notifications/', {
-      const response = await fetch('https://taksari.me/api/notifications/', {
+      const response = await fetch('http://localhost:8000/api/notifications/', {
+     
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -61,8 +61,8 @@ export function NotificationProvider({ children }) {
 
     console.log('Fetching notification stats from API');
     try {
-      // const response = await fetch('https://localhost:8000/api/notifications/stats', {
-      const response = await fetch('https://taksari.me/api/notifications/stats', {
+      const response = await fetch('http://localhost:8000/api/notifications/stats', {
+    
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -189,8 +189,7 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      const response = await fetch(`https://taksari.me/api/notifications/${notificationId}`, {
-      // const response = await fetch(`https://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -217,8 +216,8 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      // const response = await fetch('https://localhost:8000/api/notifications/mark-all-read', {
-      const response = await fetch('https://taksari.me/api/notifications/mark-all-read', {
+      const response = await fetch('http://localhost:8000/api/notifications/mark-all-read', {
+      
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -242,8 +241,8 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      // const response = await fetch(`https://localhost:8000/api/notifications/${notificationId}`, {
-      const response = await fetch(`https://taksari.me/api/notifications/${notificationId}`, {
+      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
+      
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
