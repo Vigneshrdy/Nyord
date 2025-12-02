@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { loansAPI, authAPI } from '../services/api';
 import { jsPDF } from 'jspdf';
 
+const BASE_URL = 'http://localhost:8000';
+
 const Loans = () => {
   const [loanAmount, setLoanAmount] = useState(250000);
   const [loanTenure, setLoanTenure] = useState(20);
@@ -46,7 +48,7 @@ const Loans = () => {
     fetchUser();
 
     // WebSocket live updates
-    const ws = new WebSocket('ws://localhost:8000/ws');
+    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws`);
     ws.onmessage = (msg) => {
       try {
         const event = JSON.parse(msg.data);

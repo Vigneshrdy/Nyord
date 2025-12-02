@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getToken } from '../services/api';
 
+const BASE_URL = 'http://localhost:8000';
+
 const Notifications = () => {
   const { user } = useAuth();
   const token = getToken();
@@ -18,7 +20,7 @@ const Notifications = () => {
 
   const fetchNotifications = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/', {
+      const response = await fetch(`${BASE_URL}/api/notifications/`, {
      
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -40,7 +42,7 @@ const Notifications = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/stats', {
+      const response = await fetch(`${BASE_URL}/api/notifications/stats`, {
       
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -92,7 +94,7 @@ const Notifications = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${BASE_URL}/api/notifications/${notificationId}`, {
       
         method: 'PUT',
         headers: {
@@ -117,7 +119,7 @@ const Notifications = () => {
 
   const markAllAsRead = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/mark-all-read', {
+      const response = await fetch(`${BASE_URL}/api/notifications/mark-all-read`, {
       
         method: 'PUT',
         headers: {
@@ -139,7 +141,7 @@ const Notifications = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${BASE_URL}/api/notifications/${notificationId}`, {
       
         method: 'DELETE',
         headers: {

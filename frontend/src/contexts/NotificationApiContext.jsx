@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 
+const BASE_URL = 'http://localhost:8000';
+
 const NotificationContext = createContext();
 
 export function NotificationProvider({ children }) {
@@ -29,8 +31,7 @@ export function NotificationProvider({ children }) {
 
     console.log('Fetching notifications from API');
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/', {
-     
+      const response = await fetch(`${BASE_URL}/api/notifications/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -61,8 +62,7 @@ export function NotificationProvider({ children }) {
 
     console.log('Fetching notification stats from API');
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/stats', {
-    
+      const response = await fetch(`${BASE_URL}/api/notifications/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -92,7 +92,7 @@ export function NotificationProvider({ children }) {
     }
 
     console.log('Setting up WebSocket connection for user:', user.id);
-    const websocket = new WebSocket(`ws://localhost:8000/ws?token=${token}`);
+    const websocket = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws?token=${token}`);
     
     websocket.onopen = () => {
       console.log('WebSocket connected for notifications, user:', user.id);
@@ -189,7 +189,7 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${BASE_URL}/api/notifications/${notificationId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -216,8 +216,7 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      const response = await fetch('http://localhost:8000/api/notifications/mark-all-read', {
-      
+      const response = await fetch(`${BASE_URL}/api/notifications/mark-all-read`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -241,8 +240,7 @@ export function NotificationProvider({ children }) {
     if (!token) return;
     
     try {
-      const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
-      
+      const response = await fetch(`${BASE_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
