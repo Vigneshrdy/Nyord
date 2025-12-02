@@ -18,8 +18,8 @@ const Notifications = () => {
 
   const fetchNotifications = async () => {
     try {
-      // const response = await fetch('http://localhost:8000/api/notifications/', {
-      const response = await fetch('http://taksari.me/api/notifications/', {
+      // const response = await fetch('https://localhost:8000/api/notifications/', {
+      const response = await fetch('https://taksari.me/api/notifications/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -40,8 +40,8 @@ const Notifications = () => {
 
   const fetchStats = async () => {
     try {
-      // const response = await fetch('http://localhost:8000/api/notifications/stats', {
-      const response = await fetch('http://taksari.me/api/notifications/stats', {
+      // const response = await fetch('https://localhost:8000/api/notifications/stats', {
+      const response = await fetch('https://taksari.me/api/notifications/stats', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -92,8 +92,8 @@ const Notifications = () => {
 
   const markAsRead = async (notificationId) => {
     try {
-      // const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
-      const response = await fetch(`http://taksari.me/api/notifications/${notificationId}`, {
+      // const response = await fetch(`https://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`https://taksari.me/api/notifications/${notificationId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -117,8 +117,8 @@ const Notifications = () => {
 
   const markAllAsRead = async () => {
     try {
-      // const response = await fetch('http://localhost:8000/api/notifications/mark-all-read', {
-      const response = await fetch('http://taksari.me/api/notifications/mark-all-read', {
+      // const response = await fetch('https://localhost:8000/api/notifications/mark-all-read', {
+      const response = await fetch('https://taksari.me/api/notifications/mark-all-read', {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -139,8 +139,8 @@ const Notifications = () => {
 
   const deleteNotification = async (notificationId) => {
     try {
-      // const response = await fetch(`http://localhost:8000/api/notifications/${notificationId}`, {
-      const response = await fetch(`http://taksari.me/api/notifications/${notificationId}`, {
+      // const response = await fetch(`https://localhost:8000/api/notifications/${notificationId}`, {
+      const response = await fetch(`https://taksari.me/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
