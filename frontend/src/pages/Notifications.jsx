@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { getToken } from '../services/api';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = window.location.protocol === 'https:' ? 'https://taksari.me' : 'http://taksari.me';
 
 const Notifications = () => {
   const { user } = useAuth();
