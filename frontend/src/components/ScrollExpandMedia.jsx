@@ -207,27 +207,6 @@ const ScrollExpandMedia = ({
                     />
                     <div className='absolute inset-0 bg-gradient-to-t from-black/50 to-transparent' />
                   </motion.div>
-
-                  {/* Image 4 */}
-                  <motion.div
-                    className='relative overflow-hidden rounded-2xl shadow-2xl'
-                    style={{
-                      width: `${180 + scrollProgress * (isMobileState ? 120 : 250)}px`,
-                      height: `${270 + scrollProgress * (isMobileState ? 80 : 150)}px`,
-                    }}
-                    animate={{
-                      x: scrollProgress * (isMobileState ? 100 : 200),
-                      rotateY: scrollProgress * 15,
-                    }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <img
-                      src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=500&h=700&fit=crop"
-                      alt="Banking feature 4"
-                      className='w-full h-full object-cover'
-                    />
-                    <div className='absolute inset-0 bg-gradient-to-t from-black/50 to-transparent' />
-                  </motion.div>
                 </div>
 
                 {/* Scroll indicator */}
