@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocation } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationApiContext';
 import { adminAPI } from '../services/api';
 import KYCApprovalDashboard from '../components/KYCApprovalDashboard';
@@ -9,13 +10,28 @@ import CardApprovalDashboard from '../components/CardApprovalDashboard';
 const AdminDashboard = () => {
   const { user } = useAuth();
   const { showSuccess, showError } = useNotifications();
+  const location = useLocation();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('overview');
+  
+  // Get active tab from URL
+  const getActiveTabFromPath = () => {
+    const path = location.pathname;
+    if (path === '/admin') return 'overview';
+    if (path.includes('/kyc')) return 'kyc';
+    if (path.includes('/loans')) return 'loans';
+    if (path.includes('/cards')) return 'cards';
+    if (path.includes('/users')) return 'users';
+    if (path.includes('/transactions')) return 'transactions';
+    if (path.includes('/accounts')) return 'accounts';
+    return 'overview';
+  };
+  
+  const activeTab = getActiveTabFromPath();
   const [accountsWithUsers, setAccountsWithUsers] = useState([]);
   const [transactionsWithUsers, setTransactionsWithUsers] = useState([]);
   const [allCards, setAllCards] = useState([]);
@@ -30,7 +46,9 @@ const AdminDashboard = () => {
   const [showHistory, setShowHistory] = useState({
     kyc: false,
     loans: false,
-    cards: false
+    cards: false,
+    cardsSection: 'all', // 'all' or 'approvals'
+    loansSection: 'all'  // 'all' or 'approvals'
   });
 
   useEffect(() => {
@@ -328,34 +346,7 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'overview', name: 'Overview', icon: 'dashboard' },
-              { id: 'kyc', name: 'KYC Approval', icon: 'verified_user' },
-              { id: 'loans', name: 'Loan Approvals', icon: 'trending_up' },
-              { id: 'cards', name: 'Card Approvals', icon: 'credit_card' },
-              { id: 'users', name: 'Users', icon: 'people' },
-              { id: 'transactions', name: 'Transactions', icon: 'swap_horiz' },
-              { id: 'accounts', name: 'Accounts', icon: 'account_balance' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2`}
-              >
-                <span className="material-symbols-outlined text-lg">{tab.icon}</span>
-                <span>{tab.name}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
 
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
@@ -484,21 +475,135 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
           </div>
         )}
 
-        {/* Loan Approvals Tab */}
+        {/* Loans Tab */}
         {activeTab === 'loans' && (
           <div className="space-y-6">
+            {/* Loan Section Toggle */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900">Loan Approvals</h3>
-                <button 
-                  onClick={() => toggleHistory('loans')}
-                  className="px-4 py-2 bg-orange-100 text-orange-800 rounded-lg hover:bg-orange-200 transition-colors flex items-center"
-                >
-                  <span className="material-symbols-outlined mr-2">history</span>
-                  {showHistory.loans ? 'Hide History' : 'Show History'}
-                </button>
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 flex items-center mb-4">
+                  <span className="material-symbols-outlined mr-2 text-blue-600">trending_up</span>
+                  Loan Management
+                </h3>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setShowHistory({...showHistory, loansSection: 'all'})}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      showHistory.loansSection !== 'approvals' 
+                        ? 'bg-blue-600 text-white' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All User Loans
+                  </button>
+                  <button
+                    onClick={() => setShowHistory({...showHistory, loansSection: 'approvals'})}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      showHistory.loansSection === 'approvals' 
+                        ? 'bg-orange-600 text-white' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Loan Approvals
+                  </button>
+                </div>
               </div>
-              <LoanApprovalDashboard />
+
+              {/* All User Loans Section */}
+              {showHistory.loansSection !== 'approvals' && (
+                <div>
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">All User Loans</h4>
+                      <p className="text-sm text-gray-500">Complete list of all loans issued to users</p>
+                    </div>
+                    <button 
+                      onClick={() => toggleHistory('loans')}
+                      className="px-3 py-1 bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 transition-colors flex items-center text-sm"
+                    >
+                      <span className="material-symbols-outlined mr-1 text-sm">history</span>
+                      {showHistory.loans ? 'Hide History' : 'Show History'}
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Borrower</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Amount</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Purpose</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interest Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {allLoans.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                              No loans found
+                            </td>
+                          </tr>
+                        ) : (
+                          allLoans.map((loan) => {
+                            const user = users.find(u => u.id === loan.user_id);
+                            return (
+                              <tr key={loan.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {user?.full_name || user?.username || `User ${loan.user_id}`}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                  ${loan.principal?.toLocaleString() || '0'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <span className="capitalize">{loan.purpose || 'Personal'}</span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    loan.status === 'active' || loan.status === 'approved'
+                                      ? 'bg-green-100 text-green-800' 
+                                      : loan.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {loan.status || 'Active'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {loan.created_at ? new Date(loan.created_at).toLocaleDateString() : 'Unknown'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {loan.interest_rate || '5.5'}%
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Loan Approvals Section */}
+              {showHistory.loansSection === 'approvals' && (
+                <div>
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">Pending Loan Approvals</h4>
+                      <p className="text-sm text-gray-500">Review and approve new loan applications</p>
+                    </div>
+                    <button 
+                      onClick={() => toggleHistory('loans')}
+                      className="px-3 py-1 bg-orange-100 text-orange-800 rounded-md hover:bg-orange-200 transition-colors flex items-center text-sm"
+                    >
+                      <span className="material-symbols-outlined mr-1 text-sm">history</span>
+                      {showHistory.loans ? 'Hide History' : 'Show History'}
+                    </button>
+                  </div>
+                  <LoanApprovalDashboard />
+                </div>
+              )}
             </div>
             
             {showHistory.loans && (
@@ -566,21 +671,144 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
           </div>
         )}
 
-        {/* Card Approvals Tab */}
+        {/* Cards Tab */}
         {activeTab === 'cards' && (
           <div className="space-y-6">
+            {/* Card Section Toggle */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900">Card Approvals</h3>
-                <button 
-                  onClick={() => toggleHistory('cards')}
-                  className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg hover:bg-purple-200 transition-colors flex items-center"
-                >
-                  <span className="material-symbols-outlined mr-2">history</span>
-                  {showHistory.cards ? 'Hide History' : 'Show History'}
-                </button>
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 flex items-center mb-4">
+                  <span className="material-symbols-outlined mr-2 text-purple-600">credit_card</span>
+                  Card Management
+                </h3>
+                <div className="flex space-x-4">
+                  <button
+                    onClick={() => setShowHistory({...showHistory, cardsSection: 'all'})}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      showHistory.cardsSection !== 'approvals' 
+                        ? 'bg-purple-600 text-white' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    All User Cards
+                  </button>
+                  <button
+                    onClick={() => setShowHistory({...showHistory, cardsSection: 'approvals'})}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                      showHistory.cardsSection === 'approvals' 
+                        ? 'bg-orange-600 text-white' 
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Card Approvals
+                  </button>
+                </div>
               </div>
-              <CardApprovalDashboard />
+
+              {/* All User Cards Section */}
+              {showHistory.cardsSection !== 'approvals' && (
+                <div>
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">All User Cards</h4>
+                      <p className="text-sm text-gray-500">Complete list of all cards issued to users</p>
+                    </div>
+                    <button 
+                      onClick={() => toggleHistory('cards')}
+                      className="px-3 py-1 bg-purple-100 text-purple-800 rounded-md hover:bg-purple-200 transition-colors flex items-center text-sm"
+                    >
+                      <span className="material-symbols-outlined mr-1 text-sm">history</span>
+                      {showHistory.cards ? 'Hide History' : 'Show History'}
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cardholder</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card Type</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Card Number</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issued Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {allCards.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="px-6 py-8 text-center text-gray-500">
+                              No cards found
+                            </td>
+                          </tr>
+                        ) : (
+                          allCards.map((card) => {
+                            const user = users.find(u => u.id === card.user_id);
+                            const cardNumber = card.card_number || `4532-1234-5678-${Math.floor(1000 + Math.random() * 9000)}`;
+                            const isVisible = expandedUsers.has(`card_${card.id}`);
+                            return (
+                              <tr key={card.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {user?.full_name || user?.username || `User ${card.user_id}`}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <span className="capitalize">{card.card_type || 'Credit Card'}</span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono flex items-center space-x-2">
+                                  <span className="font-mono">
+                                    {isVisible ? cardNumber : '****-****-****-****'}
+                                  </span>
+                                  <button
+                                    onClick={() => toggleUserExpansion(`card_${card.id}`)}
+                                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                                    title={isVisible ? 'Hide card number' : 'Show card number'}
+                                  >
+                                    <span className="material-symbols-outlined text-lg">
+                                      {isVisible ? 'visibility_off' : 'visibility'}
+                                    </span>
+                                  </button>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    card.status === 'active' || card.status === 'approved'
+                                      ? 'bg-green-100 text-green-800' 
+                                      : card.status === 'pending'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {card.status || 'Active'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  {card.created_at ? new Date(card.created_at).toLocaleDateString() : 'Unknown'}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Card Approvals Section */}
+              {showHistory.cardsSection === 'approvals' && (
+                <div>
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900">Pending Card Approvals</h4>
+                      <p className="text-sm text-gray-500">Review and approve new card applications</p>
+                    </div>
+                    <button 
+                      onClick={() => toggleHistory('cards')}
+                      className="px-3 py-1 bg-orange-100 text-orange-800 rounded-md hover:bg-orange-200 transition-colors flex items-center text-sm"
+                    >
+                      <span className="material-symbols-outlined mr-1 text-sm">history</span>
+                      {showHistory.cards ? 'Hide History' : 'Show History'}
+                    </button>
+                  </div>
+                  <CardApprovalDashboard />
+                </div>
+              )}
             </div>
             
             {showHistory.cards && (
