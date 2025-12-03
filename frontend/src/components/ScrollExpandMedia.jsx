@@ -135,9 +135,50 @@ const ScrollExpandMedia = ({
           </motion.div>
 
           <div className='container mx-auto flex flex-col items-center justify-start relative z-10'>
-            <div className='flex flex-col items-center justify-center w-full h-[100dvh] relative'>
-              {/* Horizontal Image Gallery */}
-              <div className='absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10'>
+            <div className='flex flex-col items-center justify-between w-full h-[100dvh] relative'>
+              {/* Hero Text Section - Top of viewport */}
+              <div
+                className={`flex items-center justify-center text-center gap-4 w-full relative z-20 transition-none flex-col pt-20 ${
+                  textBlend ? 'mix-blend-difference' : 'mix-blend-normal'
+                }`}
+              >
+                <motion.h2
+                  className='text-4xl md:text-5xl lg:text-6xl font-bold text-white transition-none'
+                  style={{ transform: `translateX(-${textTranslateX}vw)` }}
+                >
+                  {firstWord}
+                </motion.h2>
+                <motion.h2
+                  className='text-4xl md:text-5xl lg:text-6xl font-bold text-center text-white transition-none'
+                  style={{ transform: `translateX(${textTranslateX}vw)` }}
+                >
+                  {restOfTitle}
+                </motion.h2>
+                
+                {/* Date and Scroll Indicator */}
+                <div className='flex flex-col items-center text-center relative z-10 mt-8 transition-none'>
+                  {date && (
+                    <p
+                      className='text-2xl text-white/80 mb-3'
+                      style={{ transform: `translateX(-${textTranslateX}vw)` }}
+                    >
+                      {date}
+                    </p>
+                  )}
+                  {scrollToExpand && (
+                    <motion.p
+                      className='text-white/90 font-medium text-center text-lg'
+                      style={{ transform: `translateX(${textTranslateX}vw)` }}
+                      animate={{ opacity: 1 - scrollProgress }}
+                    >
+                      {scrollToExpand}
+                    </motion.p>
+                  )}
+                </div>
+              </div>
+
+              {/* Horizontal Image Gallery - Bottom of viewport */}
+              <div className='relative z-10 flex justify-center items-center w-full pb-16'>
                 <div 
                   className='flex items-center justify-center gap-4 transition-all duration-300 ease-out'
                   style={{
@@ -145,7 +186,7 @@ const ScrollExpandMedia = ({
                     opacity: 1 - scrollProgress * 0.3,
                   }}
                 >
-                  {/* Image 1 */}
+                  {/* Image 1 - Hidden initially, appears on scroll */}
                   <motion.div
                     className='relative overflow-hidden rounded-2xl shadow-2xl'
                     style={{
@@ -153,10 +194,11 @@ const ScrollExpandMedia = ({
                       height: `${300 + scrollProgress * (isMobileState ? 100 : 200)}px`,
                     }}
                     animate={{
-                      x: -scrollProgress * (isMobileState ? 100 : 200),
+                      x: scrollProgress < 0.3 ? -200 : -scrollProgress * (isMobileState ? 100 : 200),
                       rotateY: scrollProgress * -15,
+                      opacity: scrollProgress < 0.3 ? 0 : 1,
                     }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.5 }}
                   >
                     <img
                       src="https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=500&h=700&fit=crop"
@@ -166,7 +208,7 @@ const ScrollExpandMedia = ({
                     <div className='absolute inset-0 bg-gradient-to-t from-black/50 to-transparent' />
                   </motion.div>
 
-                  {/* Image 2 */}
+                  {/* Image 2 - Main center image, always visible */}
                   <motion.div
                     className='relative overflow-hidden rounded-2xl shadow-2xl z-10'
                     style={{
@@ -187,7 +229,7 @@ const ScrollExpandMedia = ({
                     <div className='absolute inset-0 bg-gradient-to-t from-black/40 to-transparent' />
                   </motion.div>
 
-                  {/* Image 3 */}
+                  {/* Image 3 - Hidden initially, appears on scroll */}
                   <motion.div
                     className='relative overflow-hidden rounded-2xl shadow-2xl'
                     style={{
@@ -195,10 +237,11 @@ const ScrollExpandMedia = ({
                       height: `${330 + scrollProgress * (isMobileState ? 120 : 250)}px`,
                     }}
                     animate={{
-                      x: scrollProgress * (isMobileState ? 50 : 100),
+                      x: scrollProgress < 0.3 ? 200 : scrollProgress * (isMobileState ? 50 : 100),
                       scale: 1 + scrollProgress * 0.15,
+                      opacity: scrollProgress < 0.3 ? 0 : 1,
                     }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.5 }}
                   >
                     <img
                       src="https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=500&h=700&fit=crop"
@@ -208,46 +251,6 @@ const ScrollExpandMedia = ({
                     <div className='absolute inset-0 bg-gradient-to-t from-black/50 to-transparent' />
                   </motion.div>
                 </div>
-
-                {/* Scroll indicator */}
-                <div className='flex flex-col items-center text-center relative z-10 mt-8 transition-none'>
-                  {date && (
-                    <p
-                      className='text-2xl text-white/80'
-                      style={{ transform: `translateX(-${textTranslateX}vw)` }}
-                    >
-                      {date}
-                    </p>
-                  )}
-                  {scrollToExpand && (
-                    <motion.p
-                      className='text-white/90 font-medium text-center text-lg'
-                      style={{ transform: `translateX(${textTranslateX}vw)` }}
-                      animate={{ opacity: 1 - scrollProgress }}
-                    >
-                      {scrollToExpand}
-                    </motion.p>
-                  )}
-                </div>
-              </div>
-
-              <div
-                className={`flex items-center justify-center text-center gap-4 w-full relative z-10 transition-none flex-col ${
-                  textBlend ? 'mix-blend-difference' : 'mix-blend-normal'
-                }`}
-              >
-                <motion.h2
-                  className='text-4xl md:text-5xl lg:text-6xl font-bold text-white transition-none'
-                  style={{ transform: `translateX(-${textTranslateX}vw)` }}
-                >
-                  {firstWord}
-                </motion.h2>
-                <motion.h2
-                  className='text-4xl md:text-5xl lg:text-6xl font-bold text-center text-white transition-none'
-                  style={{ transform: `translateX(${textTranslateX}vw)` }}
-                >
-                  {restOfTitle}
-                </motion.h2>
               </div>
             </div>
 
