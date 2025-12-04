@@ -9,7 +9,7 @@ from ..schemas import NotificationCreate, NotificationOut, NotificationUpdate, N
 from ..auth import get_current_user
 from ..websocket_manager import manager
 
-router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 async def send_real_time_notification(user_id: int, notification_data: dict):

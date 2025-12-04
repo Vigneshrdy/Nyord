@@ -8,7 +8,8 @@ import json
 
 router = APIRouter()
 
-@router.websocket("/ws")
+@router.websocket("/wss")
+@router.websocket("/wss/")
 async def websocket_endpoint(
     websocket: WebSocket,
     token: str = Query(None)

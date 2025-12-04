@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { loansAPI, authAPI } from '../services/api';
 import { jsPDF } from 'jspdf';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = window.location.protocol === 'https:' ? 'https://taksari.me' : 'http://taksari.me';
 
 const Loans = () => {
   const [loanAmount, setLoanAmount] = useState(250000);
@@ -47,49 +47,75 @@ const Loans = () => {
     fetchLoans();
     fetchUser();
 
-    // WebSocket live updates
-    const ws = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws`);
-    ws.onmessage = (msg) => {
-      try {
-        const event = JSON.parse(msg.data);
-        if (event.type === 'loan.created') {
-          setLoans(prev => {
-            const existing = prev.find(l => l.id === event.loan_id);
-            if (existing) {
-              // Merge minimal event data (keep richer fields from existing)
-              return prev.map(l => l.id === event.loan_id ? { ...l, emi: event.emi, outstanding: event.outstanding, status: 'ACTIVE' } : l);
-            }
-            // Insert placeholder; will be upgraded by apply response if already in progress
-            return [
-              ...prev,
-              {
-                id: event.loan_id,
-                user_id: event.user_id,
-                loan_type: 'Home',
-                principal: event.principal,
-                rate: interestRate,
-                tenure_months: loanTenure * 12,
-                emi: event.emi,
-                total_payable: event.outstanding,
-                amount_paid: 0,
-                outstanding: event.outstanding,
-                start_date: new Date().toISOString().slice(0,10),
-                status: 'ACTIVE'
+    // WebSocket live updates with error handling
+    let ws;
+    try {
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${wsProtocol}//taksari.me/ws`;
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = () => {
+        console.log('Loans WebSocket connected');
+      };
+      
+      ws.onmessage = (msg) => {
+        try {
+          const event = JSON.parse(msg.data);
+          if (event.type === 'loan.created') {
+            setLoans(prev => {
+              const existing = prev.find(l => l.id === event.loan_id);
+              if (existing) {
+                // Merge minimal event data (keep richer fields from existing)
+                return prev.map(l => l.id === event.loan_id ? { ...l, emi: event.emi, outstanding: event.outstanding, status: 'ACTIVE' } : l);
               }
-            ];
-          });
-        } else if (event.type === 'loan.payment') {
-          setLoans(prev => prev.map(l => (
-            l.id === event.loan_id
-              ? { ...l, outstanding: event.outstanding, status: event.status }
-              : l
-          )));
+              // Insert placeholder; will be upgraded by apply response if already in progress
+              return [
+                ...prev,
+                {
+                  id: event.loan_id,
+                  user_id: event.user_id,
+                  loan_type: 'Home',
+                  principal: event.principal,
+                  rate: interestRate,
+                  tenure_months: loanTenure * 12,
+                  emi: event.emi,
+                  total_payable: event.outstanding,
+                  amount_paid: 0,
+                  outstanding: event.outstanding,
+                  start_date: new Date().toISOString().slice(0,10),
+                  status: 'ACTIVE'
+                }
+              ];
+            });
+          } else if (event.type === 'loan.payment') {
+            setLoans(prev => prev.map(l => (
+              l.id === event.loan_id
+                ? { ...l, outstanding: event.outstanding, status: event.status }
+                : l
+            )));
+          }
+        } catch (error) {
+          console.error('Error parsing loan WebSocket message:', error);
         }
-      } catch {
-        // ignore malformed
+      };
+      
+      ws.onerror = (error) => {
+        console.error('Loans WebSocket error:', error);
+      };
+      
+      ws.onclose = (event) => {
+        console.log('Loans WebSocket disconnected:', event.code, event.reason);
+      };
+      
+    } catch (error) {
+      console.error('Failed to create loans WebSocket connection:', error);
+    }
+    
+    return () => {
+      if (ws) {
+        ws.close();
       }
-    };    
-    return () => ws.close();
+    };
   }, []);
 
   const handleApply = async () => {
