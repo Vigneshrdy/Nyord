@@ -1,23 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
-import { transactionsAPI, accountsAPI } from '../services/api';
+import { transactionsAPI, accountsAPI, adminAPI } from '../services/api';
 
 const AccountStatements = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('thisMonth');
   const [rawTransactions, setRawTransactions] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [txns, accs] = await Promise.all([
+        const [txns, accs, usersData] = await Promise.all([
           transactionsAPI.getMyTransactions(),
-          accountsAPI.getAccounts()
+          accountsAPI.getAccounts(),
+          adminAPI.getAllUsers().catch(() => []) // Fallback if not admin
         ]);
         setRawTransactions(txns || []);
         setAccounts(accs || []);
+        setUsers(usersData || []);
       } catch (e) {
         console.error('Failed to fetch data', e);
       } finally {
@@ -35,6 +38,15 @@ const AccountStatements = () => {
     });
     return map;
   }, [accounts]);
+
+  // Build user map for quick lookup
+  const userMap = useMemo(() => {
+    const map = {};
+    users.forEach(user => {
+      map[user.id] = user;
+    });
+    return map;
+  }, [users]);
 
   // Filter transactions by period
   const filteredTransactions = useMemo(() => {
@@ -136,12 +148,16 @@ const AccountStatements = () => {
         type = 'credit';
         runningBalance += txn.amount || 0;
         const srcAcc = accountMap[txn.src_account];
-        description = `Received from ${srcAcc ? srcAcc.account_number : 'Account'}`;
+        const srcUser = srcAcc?.user_id ? userMap[srcAcc.user_id] : null;
+        const userName = srcUser?.full_name || srcUser?.username || 'Unknown User';
+        description = `Received from ${userName}`;
       } else if (isDebit && !isCredit) {
         type = 'debit';
         runningBalance -= txn.amount || 0;
         const destAcc = accountMap[txn.dest_account];
-        description = `Sent to ${destAcc ? destAcc.account_number : 'Account'}`;
+        const destUser = destAcc?.user_id ? userMap[destAcc.user_id] : null;
+        const userName = destUser?.full_name || destUser?.username || 'Unknown User';
+        description = `Sent to ${userName}`;
       } else {
         // Internal transfer
         type = 'transfer';
@@ -156,11 +172,11 @@ const AccountStatements = () => {
         category: txn.status === 'SUCCESS' ? 'Transfer' : txn.status,
       };
     });
-  }, [filteredTransactions, accounts, accountMap, summary.opening]);
+  }, [filteredTransactions, accounts, accountMap, userMap, summary.opening]);
 
   const displayTransactions = enrichedTransactions;
 
-  const formatINR = (n) => `₹ ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatINR = (n) => `$ ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const downloadPdf = () => {
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
+import QRCodeDisplay from '../components/QRCodeDisplay';
 
 const Profile = () => {
   const { user: authUser, updateUser } = useAuth();
@@ -10,11 +11,28 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   
   const [formData, setFormData] = useState({
+    // Basic Info
     full_name: '',
     email: '',
     phone: '',
     address: '',
     date_of_birth: '',
+    nationality: '',
+    marital_status: '',
+    account_type: '',
+    
+    // Identification & Employment
+    government_id: '',
+    id_type: '',
+    occupation: '',
+    annual_income: '',
+    employer_name: '',
+    employment_type: '',
+    
+    // Emergency Contact
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relation: '',
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -33,11 +51,28 @@ const Profile = () => {
       const dob = profile.date_of_birth || '';
       const dobValue = typeof dob === 'string' ? (dob.includes('T') ? dob.slice(0, 10) : dob) : '';
       setFormData({
+        // Basic Info
         full_name: profile.full_name || '',
         email: profile.email || '',
         phone: profile.phone || '',
         address: profile.address || '',
         date_of_birth: dobValue,
+        nationality: profile.nationality || '',
+        marital_status: profile.marital_status || '',
+        account_type: profile.account_type || '',
+        
+        // Identification & Employment
+        government_id: profile.government_id || '',
+        id_type: profile.id_type || '',
+        occupation: profile.occupation || '',
+        annual_income: profile.annual_income || '',
+        employer_name: profile.employer_name || '',
+        employment_type: profile.employment_type || '',
+        
+        // Emergency Contact
+        emergency_contact_name: profile.emergency_contact_name || '',
+        emergency_contact_phone: profile.emergency_contact_phone || '',
+        emergency_contact_relation: profile.emergency_contact_relation || '',
       });
       setIsEditing(false);
     } catch (error) {
@@ -159,6 +194,30 @@ const Profile = () => {
               </button>
               
               <button
+                onClick={() => setActiveTab('identification')}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'identification'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-3">badge</span>
+                ID & Employment
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('emergency')}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'emergency'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-3">emergency</span>
+                Emergency Contact
+              </button>
+              
+              <button
                 onClick={() => setActiveTab('security')}
                 className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
                   activeTab === 'security'
@@ -168,6 +227,18 @@ const Profile = () => {
               >
                 <span className="material-symbols-outlined mr-3">security</span>
                 Security
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('qrcode')}
+                className={`w-full flex items-center px-4 py-3 rounded-lg transition-all ${
+                  activeTab === 'qrcode'
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                <span className="material-symbols-outlined mr-3">qr_code</span>
+                My QR Code
               </button>
             </div>
           </div>
@@ -252,6 +323,55 @@ const Profile = () => {
                         className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Nationality
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.nationality}
+                        onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="e.g., American, British, Indian"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Marital Status
+                      </label>
+                      <select
+                        value={formData.marital_status}
+                        onChange={(e) => setFormData({ ...formData, marital_status: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      >
+                        <option value="">Select marital status</option>
+                        <option value="single">Single</option>
+                        <option value="married">Married</option>
+                        <option value="divorced">Divorced</option>
+                        <option value="widowed">Widowed</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Account Type
+                    </label>
+                    <select
+                      value={formData.account_type}
+                      onChange={(e) => setFormData({ ...formData, account_type: e.target.value })}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                    >
+                      <option value="">Select account type</option>
+                      <option value="savings">Savings Account</option>
+                      <option value="current">Current Account</option>
+                    </select>
                   </div>
 
                   <div>
@@ -266,6 +386,235 @@ const Profile = () => {
                       className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
                       placeholder="Enter your address"
                     />
+                  </div>
+
+                  {isEditing && (
+                    <div className="flex justify-end space-x-4 pt-4">
+                      <button
+                        type="button"
+                        onClick={loadProfile}
+                        className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
+            )}
+
+            {/* Identification & Employment Tab */}
+            {activeTab === 'identification' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Identification & Employment</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {isEditing ? 'Editing mode enabled' : 'View mode — click Edit to make changes'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing((v) => !v)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                      isEditing
+                        ? 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {isEditing ? 'Stop Editing' : 'Edit'}
+                  </button>
+                </div>
+                
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        ID Type
+                      </label>
+                      <select
+                        value={formData.id_type}
+                        onChange={(e) => setFormData({ ...formData, id_type: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      >
+                        <option value="">Select ID type</option>
+                        <option value="passport">Passport</option>
+                        <option value="national_id">National ID</option>
+                        <option value="driving_license">Driver's License</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Government ID Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.government_id}
+                        onChange={(e) => setFormData({ ...formData, government_id: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="Enter your ID number"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Occupation
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.occupation}
+                        onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="e.g., Software Engineer, Teacher"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Employment Type
+                      </label>
+                      <select
+                        value={formData.employment_type}
+                        onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      >
+                        <option value="">Select employment type</option>
+                        <option value="employed">Employed</option>
+                        <option value="self_employed">Self Employed</option>
+                        <option value="unemployed">Unemployed</option>
+                        <option value="student">Student</option>
+                        <option value="retired">Retired</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Annual Income (USD)
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.annual_income}
+                        onChange={(e) => setFormData({ ...formData, annual_income: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="50000"
+                        min="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Employer Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.employer_name}
+                        onChange={(e) => setFormData({ ...formData, employer_name: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="Company/Organization name"
+                      />
+                    </div>
+                  </div>
+
+                  {isEditing && (
+                    <div className="flex justify-end space-x-4 pt-4">
+                      <button
+                        type="button"
+                        onClick={loadProfile}
+                        className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? 'Saving...' : 'Save Changes'}
+                      </button>
+                    </div>
+                  )}
+                </form>
+              </div>
+            )}
+
+            {/* Emergency Contact Tab */}
+            {activeTab === 'emergency' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Emergency Contact</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {isEditing ? 'Editing mode enabled' : 'View mode — click Edit to make changes'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing((v) => !v)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium ${
+                      isEditing
+                        ? 'border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {isEditing ? 'Stop Editing' : 'Edit'}
+                  </button>
+                </div>
+                
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Emergency Contact Name
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.emergency_contact_name}
+                      onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                      disabled={!isEditing}
+                      className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                      placeholder="Full name of emergency contact"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Emergency Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        value={formData.emergency_contact_phone}
+                        onChange={(e) => setFormData({ ...formData, emergency_contact_phone: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Relationship
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.emergency_contact_relation}
+                        onChange={(e) => setFormData({ ...formData, emergency_contact_relation: e.target.value })}
+                        disabled={!isEditing}
+                        className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!isEditing ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        placeholder="e.g., Parent, Spouse, Sibling, Friend"
+                      />
+                    </div>
                   </div>
 
                   {isEditing && (
@@ -375,6 +724,17 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* QR Code Tab */}
+            {activeTab === 'qrcode' && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">My QR Code</h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Your unique QR code contains your profile information and can be shared with trusted parties for quick identification.
+                </p>
+                <QRCodeDisplay className="max-w-2xl" />
               </div>
             )}
           </div>

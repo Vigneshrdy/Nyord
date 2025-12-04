@@ -28,16 +28,36 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(`${BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Request failed');
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        // If response is not JSON, use status text
+        throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+      }
+      
+      // Create proper error object with details
+      const error = new Error(errorData.detail || `Request failed: ${response.status}`);
+      error.detail = errorData.detail;
+      error.status = response.status;
+      error.data = errorData;
+      throw error;
     }
 
     return await response.json();
   } catch (error) {
-    throw error;
+    // If it's already our custom error, just re-throw
+    if (error.detail || error.status) {
+      throw error;
+    }
+    
+    // For network errors or other issues
+    const customError = new Error(error.message || 'Network error occurred');
+    customError.detail = error.message || 'Network error occurred';
+    throw customError;
   }
 };
 

@@ -8,6 +8,7 @@
     "install-frontend": "cd frontend && npm install"
   },
   "dependencies": {
+    "@zxing/library": "^0.21.3",
     "jspdf": "^3.0.4"
   }
 }

@@ -31,6 +31,14 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const response = await authAPI.login(credentials);
       setUser(response.user);
+      
+      // Handle redirect after login
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectUrl = urlParams.get('redirect');
+      if (redirectUrl) {
+        window.location.href = decodeURIComponent(redirectUrl);
+      }
+      
       return response;
     } catch (err) {
       setError(err.message);

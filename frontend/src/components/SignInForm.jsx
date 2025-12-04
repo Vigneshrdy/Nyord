@@ -88,7 +88,7 @@ const SignInForm = () => {
               <div className="text-white/70 text-sm">Active Users</div>
             </div>
             <div className="transform transition-all duration-500 hover:scale-110 delay-75">
-              <div className="text-3xl font-bold">₹2.5B+</div>
+              <div className="text-3xl font-bold">$2.5B+</div>
               <div className="text-white/70 text-sm">Transactions</div>
             </div>
             <div className="transform transition-all duration-500 hover:scale-110 delay-150">

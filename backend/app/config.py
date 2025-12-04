@@ -23,3 +23,5 @@ def get_cors_origins() -> list[str]:
 		return ["*"]
 	return CORS_ORIGINS
 
+
+

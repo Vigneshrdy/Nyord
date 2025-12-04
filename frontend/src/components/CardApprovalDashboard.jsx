@@ -17,7 +17,26 @@ const CardApprovalDashboard = () => {
     try {
       setLoading(true);
       const pending = await adminAPI.getPendingCards();
-      setPendingCards(pending);
+      console.log('Pending cards data:', pending);
+      
+      // If user details are missing, try to fetch them
+      const enrichedCards = await Promise.all(
+        pending.map(async (card) => {
+          if (!card.user && card.user_id) {
+            try {
+              const allUsers = await adminAPI.getAllUsers();
+              const user = allUsers.find(u => u.id === card.user_id);
+              return { ...card, user };
+            } catch (error) {
+              console.log('Could not fetch user details for card:', card.id);
+              return card;
+            }
+          }
+          return card;
+        })
+      );
+      
+      setPendingCards(enrichedCards);
     } catch (err) {
       setError('Failed to load pending card applications');
       console.error('Error loading card applications:', err);
@@ -144,31 +163,41 @@ const CardApprovalDashboard = () => {
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold text-lg">
-                          {card.user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                          {card.user?.username?.charAt(0)?.toUpperCase() || (card.user?.full_name?.charAt(0)?.toUpperCase()) || card.user_id?.toString().charAt(0) || 'U'}
                         </span>
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">
-                          {card.user?.full_name || card.user?.username || 'Unknown User'}
+                          {card.user?.username || card.user?.full_name || `User ${card.user_id || 'Unknown'}`}
                         </h3>
-                        <p className="text-sm text-gray-500">@{card.user?.username}</p>
+                        <p className="text-sm text-gray-500">
+                          ID: {card.user_id || 'N/A'}
+                        </p>
                       </div>
                     </div>
                     
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Email:</span>
-                        <span className="font-medium">{card.user?.email || 'Not provided'}</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">User ID:</span>
+                          <span className="font-medium">{card.user_id || 'Not provided'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Username:</span>
+                          <span className="font-medium">{card.user?.username || 'Not provided'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Email:</span>
+                          <span className="font-medium">{card.user?.email || 'Not provided'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Phone:</span>
+                          <span className="font-medium">{card.user?.phone || 'Not provided'}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-500">Applied On:</span>
+                          <span className="font-medium">{formatDate(card.created_at)}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Phone:</span>
-                        <span className="font-medium">{card.user?.phone || 'Not provided'}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Applied On:</span>
-                        <span className="font-medium">{formatDate(card.created_at)}</span>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Card Details */}

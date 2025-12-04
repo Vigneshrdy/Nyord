@@ -17,7 +17,26 @@ const LoanApprovalDashboard = () => {
     try {
       setLoading(true);
       const pending = await adminAPI.getPendingLoans();
-      setPendingLoans(pending);
+      console.log('Pending loans data:', pending);
+      
+      // If user details are missing, try to fetch them
+      const enrichedLoans = await Promise.all(
+        pending.map(async (loan) => {
+          if (!loan.user && loan.user_id) {
+            try {
+              const allUsers = await adminAPI.getAllUsers();
+              const user = allUsers.find(u => u.id === loan.user_id);
+              return { ...loan, user };
+            } catch (error) {
+              console.log('Could not fetch user details for loan:', loan.id);
+              return loan;
+            }
+          }
+          return loan;
+        })
+      );
+      
+      setPendingLoans(enrichedLoans);
     } catch (err) {
       setError('Failed to load pending loan applications');
       console.error('Error loading loan applications:', err);
@@ -128,18 +147,28 @@ const LoanApprovalDashboard = () => {
                     <div className="flex items-center space-x-3">
                       <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
                         <span className="text-white font-semibold text-lg">
-                          {loan.user?.username?.charAt(0)?.toUpperCase() || 'U'}
+                          {loan.user?.username?.charAt(0)?.toUpperCase() || (loan.user?.full_name?.charAt(0)?.toUpperCase()) || loan.user_id?.toString().charAt(0) || 'U'}
                         </span>
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">
-                          {loan.user?.full_name || loan.user?.username || 'Unknown User'}
+                          {loan.user?.username || loan.user?.full_name || `User ${loan.user_id || 'Unknown'}`}
                         </h3>
-                        <p className="text-sm text-gray-500">@{loan.user?.username}</p>
+                        <p className="text-sm text-gray-500">
+                          ID: {loan.user_id || 'N/A'}
+                        </p>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">User ID:</span>
+                        <span className="font-medium">{loan.user_id || 'Not provided'}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Username:</span>
+                        <span className="font-medium">{loan.user?.username || 'Not provided'}</span>
+                      </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-500">Email:</span>
                         <span className="font-medium">{loan.user?.email || 'Not provided'}</span>

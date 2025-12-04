@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
     username: '',
@@ -12,6 +13,9 @@ const SignIn = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Get redirect URL from search params
+  const redirectUrl = searchParams.get('redirect');
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -19,7 +23,13 @@ const SignIn = () => {
 
     try {
       await login(formData);
-      navigate('/dashboard');
+      
+      // Redirect to the intended page or dashboard
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Failed to sign in');
     } finally {
@@ -88,7 +98,7 @@ const SignIn = () => {
               <div className="text-white/70 text-sm">Active Users</div>
             </div>
             <div>
-              <div className="text-3xl font-bold">₹2.5B+</div>
+              <div className="text-3xl font-bold">$2.5B+</div>
               <div className="text-white/70 text-sm">Transactions</div>
             </div>
             <div>

@@ -2,7 +2,9 @@ from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 from . import models, utils
 from .database import get_db
+from datetime import datetime
 import random
+import asyncio
 
 
 def get_current_user(token: str = Depends(utils.get_token_from_header), db: Session = Depends(get_db)):
@@ -78,7 +80,7 @@ def register_user(user_data, db: Session):
     existing_email = db.query(models.User).filter(models.User.email == user_data.email).first()
     if existing_email:
         raise HTTPException(status_code=400, detail="Email already registered")
-
+    
     hashed_pw = utils.hash_password(user_data.password)
 
     new_user = models.User(

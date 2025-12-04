@@ -196,13 +196,25 @@ const getNavigationLinks = (user) => [
   {
     name: "Menu",
     items: [
-      { href: "/dashboard", label: "Dashboard" },
-      ...(user?.role === 'admin' ? [{ href: "/admin", label: "Admin Panel" }] : []),
-      { href: "/cards", label: "Cards" },
-      { href: "/statements", label: "Statements" },
-      { href: "/loans", label: "Loans" },
-      { href: "/fixed-deposits", label: "Fixed Deposits" },
-      { href: "https://www.tradingview.com/", label: "Stocks", external: true },
+      ...(user?.role === 'admin' 
+        ? [
+            { href: "/admin", label: "Overview" },
+            { href: "/admin/kyc", label: "KYC Approval" },
+            { href: "/admin/loans", label: "Loans" },
+            { href: "/admin/cards", label: "Cards" },
+            { href: "/admin/users", label: "Users" },
+            { href: "/admin/transactions", label: "Transactions" },
+            { href: "/admin/accounts", label: "Accounts" }
+          ]
+        : [
+            { href: "/dashboard", label: "Dashboard" },
+            { href: "/qr-payment", label: "QR Payment" },
+            { href: "/cards", label: "Cards" },
+            { href: "/statements", label: "Statements" },
+            { href: "/loans", label: "Loans" },
+            { href: "/fixed-deposits", label: "Fixed Deposits" },
+          ]
+      ),
       { href: "/notifications", label: "Notifications" },
       { href: "/profile", label: "Settings" },
     ],
