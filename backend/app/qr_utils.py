@@ -23,6 +23,8 @@ def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = 
     
     # Create payment URL that works with external scanners
     payment_url = f"{base_url}/pay?to={user_id}&hash={user_hash}"
+    print(f"QR Code Debug - Base URL: {base_url}")
+    print(f"QR Code Debug - Payment URL: {payment_url}")
     
     # Add user info as URL parameters for better UX
     if user_data:
