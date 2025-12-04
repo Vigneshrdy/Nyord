@@ -28,7 +28,7 @@ const apiRequest = async (endpoint, options = {}) => {
   };
 
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
       let errorData;

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { getToken } from '../services/api';
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = 'https://taksari.me';
 
 const QRCodeDisplay = ({ className = '' }) => {
   const [qrData, setQrData] = useState(null);
@@ -25,7 +25,7 @@ const QRCodeDisplay = ({ className = '' }) => {
     
     try {
       console.log('Fetching QR code for user ID:', user.id);
-      const response = await fetch(`${BASE_URL}/qr/generate/${user.id}`, {
+      const response = await fetch(`${BASE_URL}/api/qr/generate/${user.id}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

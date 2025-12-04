@@ -5,7 +5,7 @@ from typing import Union
 import hashlib
 import json
 
-def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = "http://localhost:3000") -> str:
+def generate_user_qr_code(user_id: int, user_data: dict = None, base_url: str = "https://bank.vigneshreddy.tech") -> str:
     """
     Generate a unique QR code for a user that contains a payment URL.
     When scanned, it redirects to the payment page.

@@ -109,7 +109,7 @@ def get_user_qr_code(
     }
     
     # Generate QR code
-    qr_code_base64 = generate_user_qr_code(user.id, user_data)
+    qr_code_base64 = generate_user_qr_code(user.id, user_data, "https://bank.vigneshreddy.tech")
     qr_hash = generate_user_qr_hash(user.id)
     
     return {
