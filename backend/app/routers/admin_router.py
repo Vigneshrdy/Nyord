@@ -320,9 +320,6 @@ async def approve_kyc(
     db.refresh(user)
     
     # KYC approval/rejection completed
-            
-    except Exception as e:
-        message += f" - Email notification error: {str(e)}"
     
     return {
         "message": message,
