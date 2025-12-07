@@ -397,27 +397,9 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Spending Overview */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Spending Overview</h3>
-              <select className="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 bg-white dark:bg-gray-800">
-                <option>Jan 12</option>
-              </select>
-            </div>
+          
 
-            {/* Chart representation */}
-            <div className="flex items-end justify-between h-32 mb-4">
-              {spendingData.map((value, index) => (
-                <div key={index} className="flex flex-col items-center gap-2">
-                  <div
-                    className={`w-6 rounded-t ${index === 4 ? 'bg-teal-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-                    style={{ height: `${(value / 100) * 80}px` }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+            
         </div>
       </div>
     </div>
