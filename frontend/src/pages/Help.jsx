@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const Help = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -190,6 +190,8 @@ const Help = () => {
                 </div>
               )}
             </div>
+
+            {/* ConvAI widget is available globally — open the assistant using the chat button in the bottom-right */}
 
 
 

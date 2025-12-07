@@ -7,6 +7,7 @@ import SidebarNavigation from './components/SidebarNavigation';
 import InteractiveMenu from './components/InteractiveMenu';
 import NotificationContainer from './components/NotificationContainer';
 import NotificationTester from './components/NotificationTester';
+import ConvAIWidget from './components/ConvAIWidget';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import { useServiceWorkerNavigation, serviceWorkerManager } from './services/serviceWorkerManager';
@@ -23,6 +24,7 @@ import FixedDeposits from './pages/FixedDeposits';
 import Profile from './pages/Profile';
 import Help from './pages/Help';
 import Transfer from './pages/Transfer';
+import Statistics from './pages/Statistics';
 import AdminDashboard from './pages/AdminDashboard';
 import Notifications from './pages/Notifications';
 import QRPayment from './pages/QRPayment';
@@ -79,6 +81,7 @@ function App() {
           <NotificationProvider>
             <NotificationContainer />
             <NotificationTester />
+            <ConvAIWidget />
             <LayoutWrapper>
             <Routes>
               <Route path="/" element={<LandingPage />} />
@@ -100,6 +103,11 @@ function App() {
             <Route path="/statements" element={
               <ProtectedRoute>
                 <AccountStatements />
+              </ProtectedRoute>
+            } />
+            <Route path="/statistics" element={
+              <ProtectedRoute>
+                <Statistics />
               </ProtectedRoute>
             } />
             <Route path="/accounts" element={

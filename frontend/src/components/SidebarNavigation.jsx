@@ -232,8 +232,8 @@ const SidebarNavigation = () => {
         <div className="flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
           {/* Logo */}
           <div className="flex items-center gap-3 py-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-teal-600 to-teal-700">
-              <span className="text-xl font-bold text-white">N</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent">
+              <img src="/logo.png" alt="Nyord" className="h-10 w-10 object-contain" />
             </div>
             <span className="text-2xl font-bold text-neutral-800 dark:text-neutral-200">
               Nyord

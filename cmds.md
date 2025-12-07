@@ -31,7 +31,7 @@ celery -A app.tasks worker --loglevel=info --pool=solo
 ### **1. SSH Into Server**
 
 ```sh
-ssh root@142.93.208.27
+
 ```
 
 ---

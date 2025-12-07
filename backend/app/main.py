@@ -14,6 +14,7 @@ from .routers import admin_router
 from .routers import notification_router
 from .routers import qr_router
 from .routers import push_router
+from .routers import stats_router
 import threading
 import asyncio
 import json
@@ -56,6 +57,7 @@ app.include_router(admin_router.router)
 app.include_router(notification_router.router)
 app.include_router(qr_router.router)
 app.include_router(push_router.router)
+app.include_router(stats_router.router)
 
 
 # Stocks streamer and /stocks endpoint removed (feature deprecated)

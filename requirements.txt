@@ -15,3 +15,5 @@ alembic
 requests
 qrcode[pil]
 pillow
+matplotlib
+seaborn
