@@ -1,0 +1,1177 @@
+
+
+High-level overview
+-------------------
+Nyord is a full-stack banking application with a FastAPI backend and a Vite + React frontend. The backend provides REST APIs for authentication, accounts, transactions, cards, loans, fixed deposits, notifications, admin operations and WebSocket support for push notifications. The frontend is a single-page React application that consumes these APIs, manages user sessions, and offers a modern banking UX with dashboards, quick transfers, statements, and administrative dashboards.
+
+Stack and main dependencies
+---------------------------
+Backend
+- FastAPI (web framework)
+- Uvicorn (ASGI server)
+- SQLAlchemy (ORM)
+- PostgreSQL (via psycopg2-binary) — configured via DATABASE_URL
+- Pydantic (schemas)
+- Celery (background tasks)
+- Pika / RabbitMQ (message bus for WebSocket / notifications)
+- websockets (native WebSocket client/server support)
+- python-jose, passlib[bcrypt] (authentication and password hashing)
+- Alembic (migrations)
+
+Frontend
+- React (v19)
+- Vite (development server + build)
+- Tailwind CSS (styling)
+- @radix-ui components + custom UI primitives
+- lucide-react (icons)
+- framer-motion (animations)
+- lightweight-charts (present for charts where used)
+
+Project layout (important files & directories)
+----------------------------------------------
+Root
+- package.json (workspace tasks; runs frontend dev)
+- requirements.txt (Python dependencies)
+- docs/ (generated corpus and docs)
+
+backend/
+- app/
+  - main.py (FastAPI app, router registration, startup tasks)
+  - database.py (SQLAlchemy engine, sessionmaker, Base)
+  - models.py (SQLAlchemy models for User, Account, Transaction, Card, Loan, FixedDeposit, Notification, AuditLog, ApprovalNotification)
+  - schemas.py (Pydantic schemas — request/response models)
+  - routers/ (separate routers per domain)
+    - auth_router.py (authentication: register, login, me)
+    - account_router.py (accounts operations: create, approve, accounts lists, transfers)
+    - transaction_router.py (transaction creation, listing)
+    - cards_router.py, loans_router.py, fixed_deposits_router.py
+    - dashboard_router.py (user dashboard summary)
+    - users_router.py (user listing/search)
+    - admin_router.py (admin-only operations)
+    - notification_router.py, ws_router.py, qr_router.py, push_router.py
+  - utils.py (helper functions such as get_current_user)
+  - rabbitmq_ws_listener.py (background listener that pushes WebSocket messages via RabbitMQ)
+  - websocket_manager.py (manages WebSocket connections and pushes)
+  - celery_app.py, tasks.py (Celery worker and tasks)
+  - config.py (environment-driven configuration: CORS origins, secrets)
+
+frontend/
+- package.json (frontend dependencies and scripts)
+- src/
+  - main.jsx (app bootstrap)
+  - App.jsx (routing & top-level providers)
+  - src/pages/ (pages like Dashboard.jsx, Transfer.jsx, AccountManager.jsx, AdminDashboard.jsx, AccountStatements.jsx)
+  - src/components/ (Navbar.jsx, SidebarNavigation.jsx, Quick Transfer components, admin components)
+  - src/contexts/ (AuthContext, NotificationApiContext, ThemeContext)
+  - src/services/api.js (central API wrapper for backend endpoints)
+  - src/lib/utils.js
+
+Authentication & Security model
+-------------------------------
+- Authentication is handled via JSON Web Tokens (JWT). The frontend stores the access token in localStorage and attaches an Authorization: Bearer <token> header to API requests via the apiRequest wrapper.
+- The backend provides protected endpoints that use dependencies to extract the current user from the token. Admin-only endpoints typically use a dependency like `auth.get_admin_user` which validates the user's role.
+- Passwords are hashed (passlib[bcrypt]).
+- CORS origins are configured dynamically via environment variables (config.get_cors_origins()).
+
+Database models (summary)
+-------------------------
+- User: id, username, email, hashed_password, role (customer|admin), kyc_approved, profile fields, approval metadata.
+- Account: id, account_number, account_type (savings|current), balance, user_id, status (pending|approved|rejected), created_at.
+- Transaction: id, src_account, dest_account, amount, status (PENDING|SUCCESS|FAILED), timestamp.
+- Card: id, user_id, card_number, pin (hashed), cvv, expiry_date, available_credit, status etc.
+- Loan: loan metadata, status, EMI, outstanding, approvals.
+- FixedDeposit: principal, rate, start/maturity, status.
+- Notification, ApprovalNotification, AuditLog: for system and admin audit and asynchronous notifications.
+
+Key backend API endpoints (representative)
+------------------------------------------
+Auth
+- POST /auth/register — register new user
+- POST /auth/login — obtain access token
+- GET /auth/me — get current user profile
+
+Accounts
+- POST /accounts/create — create account request (requires KYC)
+- POST /accounts/approve — admin approves or rejects an account
+- GET /accounts/me — get current user's accounts
+- GET /accounts/user/{user_id} — get another user's accounts (for transfers)
+- POST /accounts/transfer-between-accounts — internal user transfers between owned accounts
+- GET /accounts/my-approved — user-approved accounts list
+
+Transactions
+- POST /transactions/initiate — create transaction between accounts (canonical transaction creation)
+- GET /transactions/me — get user transactions
+- GET /admin/transactions — admin listing of transactions
+
+Admin
+- GET /admin/users — list users
+- POST /admin/approve-kyc — approve KYC
+- GET /admin/accounts — admin accounts listing
+- POST /admin/accounts/{id}/adjust-balance — admin balance adjustments
+
+Notifications & WebSocket
+- WebSocket endpoint `/ws` accepts token param and subscribes user to notification channels.
+- RabbitMQ is used as a message bus; a background listener forwards RabbitMQ messages to connected WebSocket clients.
+- Notifications table stores per-user notifications; APIs exist to fetch, mark-as-read, delete, and mark-all-read.
+
+Frontend architecture and important components
+----------------------------------------------
+- Central API wrapper: `src/services/api.js`
+  - `apiRequest` handles token header injection, error shaping (throws an Error with `detail`, `status`, `data`), and JSON response parsing.
+  - Namespaced API objects: `authAPI`, `accountsAPI`, `transactionsAPI`, `cardsAPI`, `loansAPI`, `fixedDepositsAPI`, `adminAPI`, `dashboardAPI`.
+
+- Authentication context: `src/contexts/AuthContext.jsx`
+  - Holds `user`, `login`, `logout`, `refresh` helper.
+  - Reads token from localStorage and fetches current user via `authAPI.getCurrentUser` on startup.
+
+- Notification context: `src/contexts/NotificationApiContext.jsx`
+  - Manages WebSocket connection to receive push notifications.
+  - Includes reconnect/backoff logic, fetches notification stats and notifications list.
+  - Exposes helper methods: `markAsRead`, `markAllAsRead`, `deleteNotification`, `refreshNotifications`, and toast-like helpers `showSuccess`, `showError`, etc.
+  - Does not auto-prompt for browser notification permission on mount; permission must be requested via user action.
+
+- Navbar & Sidebar
+  - `Navbar.jsx` includes top navigation and shows role-based menu items. Uses `getNavigationLinks(user)` to render admin-specific items or user items.
+  - `SidebarNavigation.jsx` provides a persistent left-hand navigation with role-aware menus and quick links to transfers, accounts, statements, and admin pages.
+
+- Pages
+  - `Dashboard.jsx`: summary dashboard for user; includes Card Overview, Quick Transfers panel, Recent Transfer Activity, and sidebar with Spending Overview. Fetches summary via `dashboardAPI.getSummary()`.
+  - `Transfer.jsx`: canonical transfer page. Supports external (to other users) and internal transfers (between user's own accounts). Supports card transfers (with PIN) and account transfers. Implements recipient search via `transactionsAPI.searchUsers(query)` and selects recipient accounts using `accountsAPI.getUserAccounts(userId)`.
+  - `AccountManager.jsx` (Accounts list): lists user accounts and provides transfer actions and account creation.
+  - `AccountStatements.jsx`: transaction history, formatted by date and summary.
+  - `AdminDashboard.jsx`: complex admin interface with tabs (overview, kyc, loans, cards, accounts, users, transactions). Admin functions are gated by user.role checks on client and protected by admin dependencies server-side.
+
+Client-side UX decisions and behaviors
+-------------------------------------
+- Quick Transfers
+  - A Quick Transfers panel appears on the Dashboard and in the Admin sidebar. It lists recent transaction users (up to a limit), and provides buttons for `Money Transfer` and `QR Transfer`.
+  - Clicking a recent user navigates to the Transfer page pre-filling the recipient (either by query param or by location state) and pre-selecting the recipient account when possible.
+
+- Notifications
+  - Notification context keeps an unread count and list of recent notifications. WebSocket messages result in in-app toast and optionally browser notifications if permission granted.
+
+- Admin vs User role gating
+  - Admin-only UI components check the `user.role` before invoking admin APIs to prevent 403 noise in the console. Server-side authorization is enforced by admin dependency functions.
+
+- Error handling
+  - `apiRequest` returns an enriched Error object when the backend returns a non-2xx status. Frontend code typically catches error and shows messages via `useNotifications` toasts or in-form messages.
+
+Developer setup & run instructions
+---------------------------------
+Prerequisites
+- Python 3.10+ (recommended)
+- Node.js 18+ (for frontend)
+- PostgreSQL database accessible via `DATABASE_URL` env var
+- RabbitMQ broker (for notifications) and Redis/broker for Celery (optional depending on config)
+
+Backend
+1. Create a Python virtual environment and install dependencies:
+   python -m venv .venv
+   .\.venv\Scripts\Activate.ps1  # PowerShell on Windows
+   pip install -r requirements.txt
+
+2. Create `.env` file with necessary environment variables (example):
+   DATABASE_URL=postgresql://user:pass@localhost:5432/nyord
+   JWT_SECRET=your_jwt_secret
+   JWT_ALGORITHM=HS256
+   FRONTEND_URL=http://localhost:3000
+   RABBITMQ_URL=amqp://guest:guest@localhost:5672/
+
+3. Run the backend (development):
+   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+4. Start background workers (if used):
+   # Start Celery (if configured)
+   celery -A app.celery_app worker --loglevel=info
+
+Frontend
+1. Install frontend dependencies:
+   cd frontend
+   npm install
+
+2. Run development server:
+   npm run dev
+   # The Vite dev server defaults to port 3000 (configured in package.json)
+
+Testing flows
+-------------
+- Register a new user via `POST /auth/register` or the Sign Up form.
+- Ensure KYC fields are completed and approved before requesting an account.
+- Log in and create an account request (`POST /accounts/create`). An admin must approve it.
+- Use the Transfer page to search for other users and perform transfers using accounts.
+- Admins can approve KYC, accounts, cards and adjust balances through admin pages.
+
+Common troubleshooting patterns (for chatbot guidance)
+----------------------------------------------------
+1. WebSocket not connecting
+- Check backend logs for rabbitmq_ws_listener startup and RabbitMQ connectivity.
+- Confirm Browser is connecting to correct ws:// or wss:// URL with token param.
+- Ensure CORS and environment variables are correct for frontend origin.
+2. Transfer fails with 500 or insufficient balance
+- Backend `transfer` endpoints validate ownership and sufficient balance. Inspect API error payload (apiRequest returns `error.data` and `error.detail`).
+- Verify account statuses are `approved` and ownership matches JWT user.
+3. Missing `Unknown User` in transaction listings
+- Backend transaction outputs were extended to include `src_user_name` and `dest_user_name` — ensure frontend uses those fields (`txn.src_user_name` / `txn.dest_user_name`). If missing, fallback to user maps.
+4. Admin 403s in frontend
+- Admin pages must check `user.role === 'admin'` before calling admin APIs. Check logs and ensure token corresponds to an admin user.
+5. Vite 500 caused by JSX inside JS function
+- Check the Dashboard or other pages for stray JSX within non-component functions; move JSX into return or proper component scope.
+
+Detailed API examples (canonical flows)
+--------------------------------------
+1) User registration (frontend -> backend)
+Request (POST /auth/register)
+{
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "secret-password"
+}
+Response
+{
+  "access_token": "<jwt-token>",
+  "token_type": "bearer",
+  "user": { "id": 12, "username":"alice","role":"customer" }
+}
+
+2) Create account (POST /accounts/create)
+- Precondition: user has `kyc_approved = true`.
+Request body (application/json):
+{ "account_type":"savings" }
+Response (AccountOut)
+{ "id": 123, "account_number": "ACCT12345678", "account_type":"savings", "balance": 0.0, "status":"pending" }
+
+3) Initiate transaction (POST /transactions/initiate)
+Request:
+{ "src_account": 101, "dest_account": 202, "amount": 150.00 }
+Response:
+{ "transaction_id": 555, "status":"PENDING" }
+
+4) Payment via Transfer page (external flow)
+- User types username in recipient field; frontend calls `/users/search?q=...` using `transactionsAPI.searchUsers`.
+- Frontend selects the recipient, fetches recipient accounts `/accounts/user/{id}`, selects recipient account, and calls `/transactions/initiate`.
+
+WebSocket / Notifications events (message shapes)
+-------------------------------------------------
+- Notification event: { type: 'notification', data: { id, title, message, type, related_id, ... } }
+- Transaction success event: { type: 'transaction.success', transaction_id, amount, new_src_balance, new_dest_balance }
+
+Admin flows and safeguards
+--------------------------
+- Admin endpoints are available under `/admin/*` and require admin JWT. The frontend additionally checks `user.role` and hides admin actions from customers.
+- Admin UI: KYC approvals, account approvals, card approvals, loan approvals, manual balance adjustments, toggling account active status.
+
+Design choices and rationale (context for AI)
+--------------------------------------------
+- Single canonical transaction creation API: The app uses `/transactions/initiate` as the unified endpoint for all transfers. By consolidating transfer logic (including validations, balance updates, transaction creation) to the backend, the frontend remains thin and consistent.
+- WebSocket + RabbitMQ: Decouples event generation from WebSocket delivery. Back-end services and background jobs publish to RabbitMQ; a listener forwards messages to connected WebSocket clients. This is robust for scaling and asynchronous tasks.
+- Admin gating on both client and server:
+  - Client-side role checks prevent unnecessary 403s and noisy logs for users.
+  - Server-side checks remain authoritative.
+- Notification permission: Not auto-prompted; only requested via user action to avoid browser UX issues.
+
+Helpful developer commands & environment notes
+---------------------------------------------
+- Start backend in dev mode (from backend folder):
+  uvicorn app.main:app --reload
+- Start frontend (from root):
+  npm run dev  # runs the frontend dev server via package.json script
+- Activate virtualenv (Windows PowerShell):
+  & ".\\.venv\\Scripts\\Activate.ps1"
+
+Testing and manual verification checklist
+----------------------------------------
+- User signup -> login works and token stored in localStorage.
+- `GET /auth/me` returns user metadata including `role` and `kyc_approved` flags.
+- Create account request flow: POST `accounts/create`, admin approves via admin UI -> account becomes `approved` and appears in `GET /accounts/me`.
+- Transfer flow: Transfer page search finds users, recipient accounts load, transaction initiated and recorded.
+- Notification flow: On transaction success, a WebSocket notification appears and unread count increments.
+- Admin UI: loading KYC pending users, approving KYC updates status in DB, and notification is generated for the user.
+
+Examples of troubleshooting conversations for the chatbot
+--------------------------------------------------------
+Q: "When I try to transfer money from Accounts page, I get an error. Transfer works on Transfer page."
+A: "Sounds like two different frontend flows are calling different backend endpoints. The Transfer page uses the canonical `/transactions/initiate` endpoint; make sure your Accounts page uses `transactionsAPI.createTransaction` (not `accountsAPI.transferBetweenAccounts`). If the server still returns 500, check the backend logs for transaction creation errors — most common causes are missing required fields or mismatched model fields; also confirm both accounts are `approved` and the source has sufficient balance."
+
+Q: "My admin UI attempts to call admin APIs and shows 403 errors in console for regular users."
+A: "Add a client-side guard so admin components only call admin APIs when `user && user.role === 'admin'`. Server-side `auth.get_admin_user` should prevent any unauthorized calls, but client-side checks avoid noisy console logs."
+
+Q: "WebSocket shows errors and doesn't reconnect when RabbitMQ restarts."
+A: "The NotificationApiContext implements reconnect/backoff logic; verify that the listener on the backend (rabbitmq_ws_listener) is running and can reach RabbitMQ. Check `.env` for correct RABBITMQ_URL and that the backend started the listener in the startup event. Also confirm the frontend is connecting to the correct ws:// URL and includes the token parameter."
+
+Corpus appendix — sample prompts and expected assistant behavior
+---------------------------------------------------------------
+- How to add a new admin user:
+  1. Create a user via `POST /auth/register`.
+  2. As an existing admin, call `adminAPI.updateUser(userId, { role: 'admin' })` OR change role in the DB for early setups.
+  3. The new admin can login and access `/admin` pages.
+
+- How to debug a failing transfer:
+  1. Reproduce the transfer and capture the error payload from the frontend (console or network tab).
+  2. Inspect the backend log lines at the time of the request.
+  3. Check model validations: account statuses, balances, account ownership.
+  4. Check transaction creation code in `routers/transaction_router.py` to identify missing or mismatched fields.
+
+- Example conversation for user-facing help:
+  Q: "How do I send money to my friend?"
+  A: "Open Transfer → choose 'To Other Users' → type your friend's username. Select the recipient account from the list, choose the source account, enter the amount, and confirm. If your friend has multiple accounts you'll choose which one to send to."
+
+- Example admin prompt:
+  Q: "Show me the SQLAlchemy model that stores transactions."
+  A: "The `Transaction` model is defined in `backend/app/models.py`. It includes `id`, `src_account`, `dest_account`, `amount`, `status`, and `timestamp`. The relationships `src_acc_rel` and `dest_acc_rel` point to `Account` entries."
+
+Training-ready Q&A pairs (basic)
+--------------------------------
+(Include pairs that map project tasks to actionable steps the assistant can recommend.)
+1. Q: "How do I run the frontend?" — A: "cd frontend && npm install && npm run dev".
+2. Q: "Which endpoint creates transactions?" — A: "POST /transactions/initiate (transactionsAPI.createTransaction)".
+3. Q: "Where are notification WebSocket messages published?" — A: "A RabbitMQ listener in `rabbitmq_ws_listener.py` forwards messages to connected WebSocket clients; check `websocket_manager.py` for connection management.".
+4. Q: "How to approve a user's account as admin?" — A: "Use POST /accounts/approve with account id and action 'approve' while authenticated as an admin, or use the Admin UI's Accounts tab.".
+
+Notes for training the chatbot
+-----------------------------
+- Keep the assistant aware that authoritative actions (account approvals, balance adjustments) should only be recommended if performed by admin users.
+- Encourage safe debugging: recommend checking logs, reproducing requests via curl/Postman, and examining DB records before making direct DB edits.
+- Include examples of `apiRequest` error handling and how the frontend surfaces `error.detail`.
+
+Closing remarks
+---------------
+This corpus is curated to give a thorough picture of the Nyord project: code structure, key behaviors, API contracts, and developer workflows. It is intentionally detailed and includes pragmatic troubleshooting steps and examples so an AI assistant trained on this content will be able to: explain features, propose code changes consistent with the codebase, and help debug runtime issues. The document is saved in `docs/project_corpus.txt` in the repository root for convenience.
+
+
+===============================================================================
+REAL-TIME BANKING SYSTEM CHATBOT TRAINING DATASET (ADDED REFERENCE)
+===============================================================================
+
+NOTE: The following section was added from the user's provided reference. If any
+data conflicts with earlier parts of this corpus, prefer this section for
+real-time/event-driven architecture guidance.
+
+SECTION 1 — SYSTEM OVERVIEW DESCRIPTION
+
+The Real-Time Data Flow Banking Sector Architecture is an event-driven banking
+platform designed to process financial operations instantly with extremely low
+latency. The system uses asynchronous communication mechanisms such as RabbitMQ
+to handle high-volume workloads without blocking the main request-response
+cycle. The platform is built using Node.js + Express for the API gateway,
+Python Celery workers for background task processing, PostgreSQL for
+relational data management, and Elasticsearch for fast search indexing. JWT
+authentication secures all user interactions, ensuring access control and data
+privacy.
+
+The system is designed to be fault-tolerant, scalable, modular, and capable of
+handling millions of operations such as deposits, withdrawals, transfers,
+statements, account creation, KYC validation, payment routing, fraud monitoring,
+and system logging. Asynchronous microservices allow isolated, reliable
+execution of banking tasks while preserving system integrity.
+
+RabbitMQ plays a critical role by acting as a message broker. Instead of
+performing long or complex tasks inside the main API request cycle, tasks are
+published to RabbitMQ queues. Celery workers consume these queues and execute
+tasks such as updating account balances, generating monthly statements,
+notifying users about successful transfers, or triggering fraud checks. This
+ensures that the client receives instant responses while the heavy tasks are
+handled in the background.
+
+SECTION 2 – CORE COMPONENT DESCRIPTIONS
+1. API Gateway (Node.js + Express)
+
+The API gateway acts as the main entry point for all banking actions. It
+validates JWT tokens, checks user roles, rate-limits API calls, and forwards
+heavy operations to background workers via RabbitMQ. It manages routes related
+to authentication, account operations, transaction processing, and KYC
+services.
+
+2. Authentication Layer (JWT Auth)
+
+The platform uses JWT authentication for stateless session management. A user
+logs in, receives a signed token, and uses it for future requests. The token
+includes user role, ID, and permissions. JWT avoids storing session data in
+memory, making horizontal scaling easier.
+
+3. RabbitMQ Message Broker
+
+RabbitMQ is used to queue and route tasks between microservices. It ensures
+tasks are durable, retries are handled, failures are logged, and ordering is
+preserved when required. It supports fanout, direct, and topic exchanges to
+route events such as transaction.created, kyc.completed, or account.updated.
+
+4. Celery Python Workers
+
+Celery workers perform long-running tasks asynchronously. They listen to
+RabbitMQ queues and execute Python functions such as updating balances, sending
+emails, running fraud detection checks, writing logs to Elasticsearch, or
+generating PDF statements.
+
+5. PostgreSQL (Primary Database)
+
+Postgres stores all core banking data: user profiles, accounts, balances, KYC
+records, transactions, approvals, audit logs, and configurations. It supports
+ACID-compliant transactions to ensure data consistency across transfers and
+deposits.
+
+6. Elasticsearch
+
+Elasticsearch is used for full-text search and analytics queries. Instead of
+querying the main database for heavy logs or transaction histories, the
+platform syncs them into Elasticsearch for fast access. This improves
+performance for dashboards and admin features.
+
+SECTION 3 — SAMPLE QA FOR TRAINING THE CHATBOT
+Q: What happens when a user initiates a money transfer?
+
+When a user initiates a transfer, the API gateway verifies the JWT token,
+checks account balance, and publishes a transfer.initiated event to RabbitMQ.
+A Celery worker consumes the event, locks the sender account using a
+distributed lock, updates balances, records the transaction in Postgres,
+replicates logs to Elasticsearch, and publishes a transfer.success event. The
+API gateway then notifies the user in real time.
+
+Q: Why is RabbitMQ used instead of direct API calls?
+
+RabbitMQ prevents blocking the user-facing API. If the system performed all
+updates synchronously, high traffic could lead to timeouts and failures. By
+offloading tasks to queues, the system remains responsive, scalable, and
+reliable. It also allows retry strategies, dead letter queues, and work
+distribution.
+
+Q: What is an event-driven architecture in banking?
+
+Event-driven architecture means every financial action triggers an event such
+as transaction.created, deposit.completed, or kyc.verified. These events are
+processed asynchronously by microservices, allowing real-time updates and
+modular workflows.
+
+Q: How is user authentication secured?
+
+Authentication uses JWT tokens signed with a private server key. Tokens include
+user ID, role, and expiration. Sensitive actions require token validation and
+sometimes two-factor authentication.
+
+Q: How does the system prevent double spending in transfers?
+
+The Celery worker uses distributed locking (via Postgres row locks or Redis
+locks). This ensures only one worker can modify a specific account’s balance at
+a time. This prevents race conditions and double deductions.
+
+Q: How are admin dashboards powered?
+
+Admin dashboards fetch analytical data from Elasticsearch. This includes
+transaction trends, user growth, suspicious activities, error logs, and fraud
+alerts.
+
+SECTION 4 — MINI-SCENARIOS / TRAINING CONTEXT
+Scenario: Monthly Statement Generation
+
+At midnight on the first of each month, a cron job triggers a background task.
+A Celery worker retrieves user transaction history from Postgres, formats it
+as a PDF, uploads it to storage, and indexes metadata into Elasticsearch.
+Users receive notifications instantly through WebSockets.
+
+Scenario: Fraud Detection
+
+Whenever a large transfer occurs, the system publishes a fraud.check event. The
+fraud service analyzes the transaction pattern using previous data stored in
+Elasticsearch. If suspicious behavior is detected, a fraud alert is sent to the
+admin.
+
+Scenario: KYC Verification
+
+A user uploads Aadhaar or PAN documents. The API gateway stores them, sends a
+kyc.review job to RabbitMQ, and a Celery worker validates the documents. Once
+approved, the user receives real-time notification.
+
+SECTION 5 — DEFINITIONS FOR TRAINING
+
+ACID Transactions: Atomicity, Consistency, Isolation, Durability — required for
+banking integrity.
+
+Idempotency: Ensures reprocessing the same event does not duplicate charges.
+
+Dead Letter Queue (DLQ): Stores failed messages for debugging.
+
+Fanout Exchange: Broadcasts events to multiple services (e.g., update logs +
+send notifications).
+
+Microservices: Independent services performing tasks like KYC, fraud analysis,
+notifications.
+
+Event Producers: Components that publish events (API gateway).
+
+Event Consumers: Workers that process events (Celery).
+
+SECTION 6 — SAMPLE USER CHAT TRAINING DIALOGS
+User: How does the system handle failed transactions?
+
+Bot: Failed transactions are stored in a dead-letter queue. A retry mechanism
+attempts processing again. If it repeatedly fails, the system logs the error in
+Elasticsearch and alerts the admin.
+
+User: Can the system scale to millions of users?
+
+Bot: Yes. The architecture uses stateless Node.js servers, message queues, and
+distributed Celery workers, enabling horizontal scaling for high traffic.
+
+User: What is the role of PostgreSQL here?
+
+Bot: PostgreSQL is the source of truth for all structured banking data. It
+guarantees consistency for balances and transactions using ACID-compliant
+operations.
+
+SECTION 7 — DETAILED SERVICE-BY-SERVICE WORKFLOWS
+7.1 Customer Login Workflow
+
+User enters email + password.
+
+API Gateway validates input and queries PostgreSQL for user credentials.
+
+If the password matches, the gateway generates a JWT token with:
+
+user_id
+
+role
+
+authentication time
+
+token expiration
+
+Token is returned to client and stored in memory/local storage.
+
+Further APIs require token verification.
+
+Audit log “user.logged_in” event is sent to RabbitMQ → consumed by logging
+service → indexed in Elasticsearch.
+
+Strength: Stateless auth allows scaling to hundreds of servers.
+
+7.2 Money Deposit Workflow
+
+Customer requests deposit through front-end.
+
+API Gateway validates the token and payload.
+
+Gateway publishes a deposit.requested event to RabbitMQ.
+
+Celery worker receives the event and begins processing:
+
+Lock user account row in PostgreSQL
+
+Increase balance
+
+Insert transaction record
+
+Release lock
+
+Worker publishes deposit.completed.
+
+Notification service sends message to user via WebSocket.
+
+Logs service writes a structured log entry to Elasticsearch.
+
+7.3 Aadhaar / KYC Verification Workflow
+
+User uploads Aadhaar card, PAN, selfie image.
+
+API Gateway stores encrypted files.
+
+A kyc.verification_pending event is sent to RabbitMQ.
+
+KYC Worker processes images:
+
+OCR extraction
+
+Face match
+
+Government ID validation (mock in demo system)
+
+Worker updates PostgreSQL with KYC status = “approved/rejected”.
+
+Worker sends kyc.status_changed event.
+
+User receives real-time notification.
+
+Note: In real banks, Aadhaar Offline XML or DigiLocker is used.
+
+SECTION 8 — MICROSERVICE PROFILES FOR TRAINING
+8.1 Transaction Microservice
+
+Responsible for deposits, withdrawals, transfers.
+
+Uses idempotent keys to prevent duplicate processing.
+
+Uses database locks to guarantee balance accuracy.
+
+Emits events such as:
+
+transaction.failed
+
+transaction.completed
+
+transaction.reversed
+
+8.2 Notification Microservice
+
+Sends in-app notifications and pushes updates to WebSockets.
+
+Can send email/SMS if configured.
+
+Subscribes to events:
+
+transfer.success
+
+kyc.approved
+
+loan.approved
+
+8.3 Logging Microservice
+
+Converts system events into structured logs.
+
+Indexes logs in Elasticsearch.
+
+Provides search API for admin dashboards.
+
+Tracks system errors, fraud alerts, worker failures.
+
+SECTION 9 — EXTENDED Q&A FOR MODEL TRAINING
+Q: What is a message broker, and why is RabbitMQ used in this system?
+
+A message broker is a software responsible for routing messages between
+services. RabbitMQ is used because it supports durable queues, multiple
+exchange types, guaranteed delivery, retry mechanisms, and horizontal scaling.
+It ensures the banking platform remains responsive and fault-tolerant.
+
+Q: What is the role of Celery workers in this project?
+
+Celery workers perform background tasks such as updating balances, generating
+reports, sending notifications, validating KYC documents, and writing to
+Elasticsearch. They offload heavy jobs from the main API.
+
+Q: How does the system guarantee consistency during transfers?
+
+The system uses atomic database transactions with row locking. This ensures
+that during a transfer, only one worker can modify an account balance at a
+time, preventing race conditions.
+
+Q: Can this architecture handle millions of requests per day?
+
+Yes. Multiple Node.js servers, distributed Celery workers, and RabbitMQ
+clustering make the system horizontally scalable.
+
+SECTION 10 — ERROR HANDLING SCENARIOS
+Scenario A — Insufficient Balance
+
+Worker receives transfer.requested.
+
+Validates sender's balance.
+
+If balance insufficient:
+
+Worker publishes transfer.failed.insufficient_funds.
+
+API returns failure message.
+
+Log entry written to Elasticsearch.
+
+Scenario B — RabbitMQ Queue Overload
+
+If queue length becomes too large:
+
+A warning event system.queue_overflow is generated.
+
+Admin dashboard shows alert.
+
+Autoscaler launches new Celery worker instances.
+
+Messages continue seamlessly.
+
+Scenario C — PostgreSQL Failure
+
+When DB is unreachable:
+
+Worker places message into retry queue.
+
+Logs error to Elasticsearch.
+
+System remains operational due to decoupling.
+
+SECTION 11 — FRAUD DETECTION LOGIC (TRAINING DATA)
+Rules Used in Demo System:
+
+Transfers above ₹50,000 trigger manual review.
+
+More than 5 transactions in 1 minute triggers a fraud flag.
+
+Login from a new device after transfer triggers an OTP check.
+
+If KYC is pending, high-value transfers are blocked.
+
+Fraud Event Flow
+
+Transaction Worker publishes fraud.check_required.
+
+Fraud Service analyzes user history stored in Elasticsearch.
+
+Result is either:
+
+fraud.cleared
+
+fraud.suspected
+
+Admin dashboard displays real-time alerts.
+
+SECTION 12 — LONG-FORM TECHNICAL EXPLANATIONS
+Why Event-Driven Architecture is Best for Banking
+
+Traditional synchronous APIs cannot handle spikes in traffic or long-running
+operations. Event-driven models allow tasks to be executed asynchronously,
+enabling the system to remain fast and fail-safe. Banks require strong
+guarantees of atomicity, durability, and resilience, which are naturally
+supported by message-driven designs.
+
+Why PostgreSQL Is Used Over MongoDB
+
+Banking requires strict ACID compliance.
+PostgreSQL provides:
+
+Strong consistency
+
+Transaction isolation levels
+
+Row-level locks
+
+Rich relational modeling
+
+MongoDB is great for unstructured data but not ideal for money ledger
+consistency.
+
+Why Elasticsearch Is Needed
+
+Searching millions of logs or transactions in PostgreSQL is slow.
+Elasticsearch offers:
+
+Instant indexing
+
+Full-text search
+
+Analytics aggregations
+
+Log visualization capabilities
+
+It powers admin dashboards and audit logs.
+
+SECTION 13 — SIMULATED USER CONVERSATIONS
+User: How do I retrieve my last 10 transactions?
+
+Bot: The API Gateway authenticates your JWT, queries PostgreSQL for your
+latest transactions, and formats the response. Heavy reporting queries are
+powered by Elasticsearch for instant results.
+
+User: What happens if two users transfer at the same time?
+
+Bot: Database-level row locking ensures operations are serialized. This
+prevents double spending and maintains balance integrity.
+
+User: Can I link multiple bank accounts?
+
+Bot: Yes. The system supports multiple accounts per user. Each account has
+independent balances, transactions, and KYC checks.
+
+SECTION 14 — REALISTIC LOG EXAMPLES FOR MODEL TRAINING
+[2025-01-12 10:45:22] EVENT: transfer.initiated 
+USER: 10294 
+AMOUNT: 2500 
+STATUS: processing 
+QUEUE: banking.transactions 
+
+[2025-01-12 10:45:24] EVENT: transfer.completed 
+USER: 10294 
+AMOUNT: 2500 
+BALANCE_AFTER: 78500 
+STATUS: success 
+
+[2025-01-12 10:48:51] EVENT: fraud.suspected 
+USER: 10922 
+REASON: high-frequency-transfers 
+ACTION: admin_review 
+
+SECTION 15 — ADVANCED CONCEPT DEFINITIONS
+Idempotency
+
+A transfer email or transaction processed twice must not produce double
+results. Idempotency keys avoid repeated actions.
+
+Durable Queues
+
+RabbitMQ stores messages to disk to survive restarts.
+
+Fanout Exchange
+
+Used when we want to broadcast events like “transaction completed” to
+multiple microservices.
+
+Dead Letter Queue
+
+Failed messages are routed here for debugging.
+
+SECTION 16 — EXTENDED ARCHITECTURE EXPLANATIONS
+API Gateway Responsibilities
+
+Input validation
+
+JWT validation
+
+Rate limiting
+
+Role-based access
+
+Publishing events to RabbitMQ
+
+Returning fast responses
+
+Celery Worker Responsibilities
+
+Core business logic
+
+Long-running operations
+
+Retrying failed tasks
+
+Logging to Elasticsearch
+
+Triggering notifications
+
+Admin Dashboard Data Flow
+
+Data moves from:
+API → RabbitMQ → Log worker → Elasticsearch → Dashboard UI.
+
+SECTION 17 — FRONTEND REAL-TIME NOTIFICATION FLOW
+
+Backend emits event notify.user.<id>.
+
+WebSocket server receives event.
+
+Connected frontend listens to channel.
+
+Instant notification is shown to user:
+
+Money received
+
+Transaction failed
+
+KYC approved
+
+Account updated
+
+SECTION 18 — CUSTOMER SUPPORT FAQ CONTENT
+
+How long do transfers take?
+Transfers occur in real time because processing happens asynchronously using message queues.
+
+Why was my KYC rejected?
+Low-quality images, mismatched face data, or incorrect ID numbers can cause rejections.
+
+Can I reset my password?
+Yes. An OTP-based reset flow is available.
+
+===============================================================================
+SAMPLE CODE SNIPPETS — EVENT PUBLISHING & CONSUMPTION
+===============================================================================
+
+1) Node.js Express: publish a transfer event to RabbitMQ (example)
+
+```js
+// publish-transfer.js
+const amqplib = require('amqplib');
+
+async function publishTransfer(channel, exchange, event) {
+  const routingKey = 'transaction.initiated';
+  const payload = Buffer.from(JSON.stringify(event));
+  await channel.publish(exchange, routingKey, payload, { persistent: true });
+}
+
+async function main() {
+  const conn = await amqplib.connect(process.env.RABBITMQ_URL);
+  const ch = await conn.createChannel();
+  const exchange = 'banking.events';
+  await ch.assertExchange(exchange, 'topic', { durable: true });
+
+  // Example usage inside an Express route
+  // const event = { type: 'transaction.initiated', data: { src_account: 101, dest_account: 202, amount: 150.0, idempotency_key: 'abc-123' } };
+  // await publishTransfer(ch, exchange, event);
+}
+
+main().catch(console.error);
+```
+
+2) Python Celery worker: consume and process a transfer (simplified)
+
+```python
+# tasks.py
+from celery import Celery
+from sqlalchemy import select
+from db import SessionLocal
+from models import Account, Transaction
+from distributed_lock import acquire_lock
+
+celery = Celery('workers', broker=os.getenv('RABBITMQ_URL'))
+
+@celery.task(bind=True, acks_late=True)
+def process_transfer(self, event):
+    data = event.get('data', {})
+    src = data['src_account']
+    dst = data['dest_account']
+    amount = data['amount']
+    idempotency_key = data.get('idempotency_key')
+
+    # Idempotency check (simplified)
+    with SessionLocal() as db:
+        # Acquire a row-level lock on the src account to prevent races
+        with acquire_lock(db, src):
+            src_acc = db.execute(select(Account).where(Account.id==src)).scalar_one()
+            if src_acc.balance < amount:
+                # publish failure or raise
+                return {'status': 'failed', 'reason': 'insufficient_funds'}
+
+            src_acc.balance -= amount
+            dst_acc = db.execute(select(Account).where(Account.id==dst)).scalar_one()
+            dst_acc.balance += amount
+
+            txn = Transaction(src_account=src, dest_account=dst, amount=amount, status='SUCCESS')
+            db.add(txn)
+            db.commit()
+
+    # Publish transfer.success via RabbitMQ or other event mechanism
+    return {'status': 'success', 'transaction_id': txn.id}
+```
+
+3) Example curl for initiating a transfer via API Gateway (uses canonical transactions endpoint)
+
+```bash
+curl -X POST "https://api.example.com/transactions/initiate" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{ "src_account": 101, "dest_account": 202, "amount": 150.00, "idempotency_key": "req-12345" }'
+```
+
+===============================================================================
+CHANGELOG
+===============================================================================
+- 2025-12-06: Appended Real-Time Banking System reference and sample code
+  snippets (Node.js + Python Celery) per user's request.
+
+===============================================================================
+ADDITIONAL API EXAMPLES, JSON SCHEMAS & TROUBLESHOOTING (ADDED 2025-12-06)
+===============================================================================
+
+SECTION: Canonical API JSON schemas
+
+1) Transaction Initiation - Request schema (JSON Schema)
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TransactionInitiateRequest",
+  "type": "object",
+  "required": ["src_account", "dest_account", "amount", "idempotency_key"],
+  "properties": {
+    "src_account": { "type": "integer", "minimum": 1 },
+    "dest_account": { "type": "integer", "minimum": 1 },
+    "amount": { "type": "number", "minimum": 0.01 },
+    "currency": { "type": "string", "minLength": 3, "default": "INR" },
+    "metadata": { "type": "object" },
+    "idempotency_key": { "type": "string" }
+  }
+}
+
+2) Transaction Initiation - Response schema (success)
+
+{
+  "type": "object",
+  "properties": {
+    "transaction_id": { "type": "integer" },
+    "status": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}
+
+3) Standard Error Response schema
+
+{
+  "type": "object",
+  "properties": {
+    "detail": { "type": "string" },
+    "code": { "type": "string" },
+    "data": { "type": "object" }
+  }
+}
+
+SECTION: More concrete curl examples
+
+- Initiate a transfer (with idempotency header):
+
+```bash
+curl -s -X POST "http://localhost:8000/transactions/initiate" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: req-$(date +%s)" \
+  -d '{ "src_account": 101, "dest_account": 202, "amount": 150.00, "idempotency_key": "req-12345" }'
+```
+
+- Get recent transactions for the logged-in user:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "http://localhost:8000/transactions/me?limit=10"
+```
+
+- Approve an account (admin):
+
+```bash
+curl -X POST "http://localhost:8000/admin/accounts/approve" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"account_id": 123, "action": "approve"}'
+```
+
+SECTION: WebSocket client (browser / Node) example
+
+1) Browser WebSocket connection (connect with token param):
+
+```js
+// ws-client.js (browser)
+const token = localStorage.getItem('access_token');
+const wsUrl = `ws://${window.location.hostname}:8000/ws?token=${encodeURIComponent(token)}`;
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = () => console.log('ws open');
+ws.onmessage = (ev) => {
+  const msg = JSON.parse(ev.data);
+  console.log('WS message', msg);
+};
+ws.onclose = () => console.log('ws closed');
+ws.onerror = (e) => console.error('ws error', e);
+```
+
+2) Simple Node WebSocket client using `ws` package:
+
+```js
+// node-ws-client.js
+const WebSocket = require('ws');
+const token = process.env.TOKEN;
+const ws = new WebSocket(`ws://localhost:8000/ws?token=${token}`);
+ws.on('open', () => console.log('open'));
+ws.on('message', (m) => console.log('msg', m.toString()));
+ws.on('close', () => console.log('close'));
+ws.on('error', (e) => console.error(e));
+```
+
+SECTION: RabbitMQ & Celery debugging quick commands
+
+- RabbitMQ queue list (on host running rabbitmqctl):
+
+```powershell
+rabbitmqctl list_queues name messages_ready messages_unacknowledged
+```
+
+- RabbitMQ exchanges and bindings:
+
+```powershell
+rabbitmqctl list_exchanges
+rabbitmqctl list_bindings
+```
+
+- Celery worker inspect (from project root):
+
+```powershell
+celery -A app.celery_app status
+celery -A app.celery_app inspect active
+celery -A app.celery_app inspect reserved
+```
+
+- Check for Postgres row locks (psql):
+
+```sql
+SELECT pid, now() - pg_stat_activity.query_start AS duration, query
+FROM pg_stat_activity
+WHERE state = 'active' AND query NOT ILIKE '%pg_stat_activity%';
+
+-- See locks
+SELECT * FROM pg_locks pl JOIN pg_stat_activity pa ON pa.pid = pl.pid;
+```
+
+SECTION: Dead-letter queue & retry handling (example)
+
+Describe: Use DLQ to collect messages that repeatedly fail. Configure a retry
+policy and a maximum retry count; when exhausted, route message to DLQ for
+manual inspection.
+
+Example RabbitMQ DLX policy (conceptual):
+
+```text
+exchange: banking.events
+queue: banking.transactions
+arguments: { x-dead-letter-exchange: 'banking.dlq', x-message-ttl: 60000 }
+
+When consumer rejects or times out the message beyond retry count, message
+arrives at exchange 'banking.dlq' bound to queue 'banking.transactions.dlq'.
+```
+
+SECTION: Elasticsearch indexing (Python example)
+
+```python
+from elasticsearch import Elasticsearch
+es = Elasticsearch([{'host': 'localhost', 'port': 9200}])
+
+def index_transaction(txn):
+    doc = {
+        'transaction_id': txn.id,
+        'src_account': txn.src_account,
+        'dest_account': txn.dest_account,
+        'amount': txn.amount,
+        'status': txn.status,
+        'timestamp': txn.timestamp.isoformat()
+    }
+    es.index(index='transactions', id=txn.id, document=doc)
+```
+
+SECTION: Troubleshooting patterns & checklist (extended)
+
+- If transfers are delayed or stuck:
+  - Check RabbitMQ queue lengths and consumer status.
+  - Inspect Celery worker logs for exceptions or tracebacks.
+  - Verify idempotency keys: duplicate requests should return idempotent
+    responses instead of creating duplicate transactions.
+
+- If transactions fail with locking errors:
+  - Inspect `pg_locks` and the queries holding locks.
+  - Ensure long-running reporting queries are offloaded to replicas or
+    Elasticsearch.
+
+- If WebSocket messages are not delivered:
+  - Ensure `rabbitmq_ws_listener.py` or the WS forwarding service is running.
+  - Verify the WebSocket manager has open connections and the token param is
+    valid.
+
+- If Celery tasks are not executed:
+  - Confirm Celery worker processes are running and connected to the same
+    broker (RABBITMQ_URL).
+  - Use `celery -A app.celery_app inspect active` to see active tasks.
+
+SECTION: Best-practices checklist to include in training
+
+- Use idempotency keys for all externally visible operations that cause
+  side-effects (transactions, refunds, account creation).
+- Log structured events (JSON) and index to Elasticsearch for searchability.
+- Keep API gateway responses fast — offload heavy work to background tasks.
+- Protect admin endpoints with both server-side and client-side role checks.
+
+===============================================================================
+END OF ADDITIONS
+===============================================================================
+
+PROJECT MENTOR
+--------------
+Project Mentor: Anusha Mahanthi
+
+
+z
+

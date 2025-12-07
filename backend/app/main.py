@@ -13,9 +13,9 @@ from .routers import users_router
 from .routers import admin_router
 from .routers import notification_router
 from .routers import qr_router
+from .routers import push_router
 import threading
 import asyncio
-import websockets
 import json
 import os
 from dotenv import load_dotenv
@@ -23,13 +23,6 @@ from .rabbitmq_ws_listener import rabbitmq_ws_listener
 from . import config
 
 load_dotenv()
-FINNHUB_KEY = os.getenv("FINNHUB_KEY")
-
-# In-memory latest prices with mock data for testing
-latest_prices = {
-    "AAPL": 195.89,
-    "NVDA": 140.25
-}
 
 
 
@@ -62,44 +55,10 @@ app.include_router(users_router.router)
 app.include_router(admin_router.router)
 app.include_router(notification_router.router)
 app.include_router(qr_router.router)
+app.include_router(push_router.router)
 
 
-async def stock_streamer():
-    """Background task: Connect to Finnhub WebSocket and update prices"""
-    url = f"wss://ws.finnhub.io?token={FINNHUB_KEY}"
-
-    while True:
-        try:
-            async with websockets.connect(url) as ws:
-                await ws.send(json.dumps({"type": "subscribe", "symbol": "AAPL"}))
-                await ws.send(json.dumps({"type": "subscribe", "symbol": "NVDA"}))
-
-                print("Subscribed to AAPL & NVDA")
-
-                while True:
-                    msg = await ws.recv()
-                    data = json.loads(msg)
-
-                    if "data" in data:
-                        for tick in data["data"]:
-                            symbol = tick["s"]
-                            price = tick["p"]
-                            latest_prices[symbol] = price
-                            print(symbol, price)
-
-        except Exception as e:
-            print("WebSocket error:", e)
-            print("Reconnecting in 3 seconds...")
-            await asyncio.sleep(3)  # auto reconnect
-
-
-@app.get("/stocks/{symbol}")
-def get_stock(symbol: str):
-    symbol = symbol.upper()
-    return {
-        "symbol": symbol,
-        "price": latest_prices.get(symbol)
-    }
+# Stocks streamer and /stocks endpoint removed (feature deprecated)
 
 
 @app.on_event("startup")
@@ -111,5 +70,4 @@ async def start_background_tasks():
     )
     thread.start()
     
-    # Start stock streamer
-    asyncio.create_task(stock_streamer())
+    # stock streamer removed

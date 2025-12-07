@@ -1,15 +1,13 @@
 // Browser notification service
 class BrowserNotificationService {
   constructor() {
-    this.permission = 'default';
-    this.init();
+    // Do not auto-request permission on construction; let the app ask explicitly
+    this.permission = (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : 'default';
   }
 
   async init() {
-    // Request notification permission if available
-    if ('Notification' in window) {
-      this.permission = await this.requestPermission();
-    }
+    // Deprecated: prefer explicit request via requestPermission()
+    return this.permission;
   }
 
   async requestPermission() {
@@ -128,12 +126,12 @@ class BrowserNotificationService {
   }
 
   isEnabled() {
-    return this.permission === 'granted';
+    return (typeof Notification !== 'undefined' && Notification.permission === 'granted') || this.permission === 'granted';
   }
 
   // Get current permission status
   getPermissionStatus() {
-    return this.permission;
+    return (typeof Notification !== 'undefined' && Notification.permission) ? Notification.permission : this.permission;
   }
 }
 

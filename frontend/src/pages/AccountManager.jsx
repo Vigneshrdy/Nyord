@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import CreateAccount from '../components/CreateAccount';
-import { accountsAPI } from '../services/api';
+import { accountsAPI, transactionsAPI } from '../services/api';
 
 const AccountManager = () => {
   const [accounts, setAccounts] = useState([]);
@@ -59,13 +59,14 @@ const AccountManager = () => {
     setTransferSuccess('');
 
     try {
-      await accountsAPI.transferBetweenAccounts({
-        from_account_id: parseInt(transferData.from_account_id),
-        to_account_id: parseInt(transferData.to_account_id),
+      // Use the transactions API for account-to-account transfers (same as Transfer page)
+      await transactionsAPI.createTransaction({
+        src_account: parseInt(transferData.from_account_id),
+        dest_account: parseInt(transferData.to_account_id),
         amount: parseFloat(transferData.amount)
       });
 
-      setTransferSuccess(`Transfer of $${transferData.amount} completed successfully!`);
+      setTransferSuccess(`Transfer initiated successfully!`);
       setTransferData({
         from_account_id: '',
         to_account_id: '',

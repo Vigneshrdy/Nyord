@@ -1,0 +1,192 @@
+Nyord — Project Corpus (Organized Theme-Wise)
+
+Purpose
+-------
+This theme-organized corpus collects the Nyord project information into focused sections so it's easy to scan, search, and use for chatbot training or onboarding.
+
+1. Overview & Goals
+-------------------
+- Project: Nyord — full-stack real-time banking application.
+- Goal: Provide an event-driven, low-latency platform for bank operations (accounts, transfers, KYC, notifications, admin tools).
+- Key architectural pattern: Event-driven microservices using RabbitMQ + Celery for background processing and WebSocket forwarding for real-time notifications.
+
+2. Stack & Dependencies
+-----------------------
+Backend
+- FastAPI, Uvicorn
+- SQLAlchemy, PostgreSQL
+- Pydantic (schemas)
+- Celery (background workers) + RabbitMQ broker
+- ElasticSearch for logs/search (optional)
+- python-jose, passlib[bcrypt] for auth
+
+Frontend
+- React (Vite)
+- Tailwind CSS
+- Framer Motion, lucide-react
+- WebSocket client (native browser API)
+
+Dev tools
+- Node.js 18+, Python 3.10+
+
+3. Project Layout (files & responsibilities)
+-------------------------------------------
+Root
+- `package.json`, `requirements.txt`, `docs/`
+
+backend/app/
+- `main.py` — app & router registration, startup tasks
+- `database.py` — engine & SessionLocal
+- `models.py` — SQLAlchemy models (User, Account, Transaction, etc.)
+- `schemas.py` — Pydantic request/response models
+- `routers/` — domain routers: auth, accounts, transactions, admin, notifications, ws, qr, push
+- `rabbitmq_ws_listener.py` — forwards RabbitMQ messages to WebSocket manager
+- `websocket_manager.py` — manages active WS connections
+- `celery_app.py`, `tasks.py` — Celery worker entry points
+
+frontend/
+- `src/main.jsx`, `App.jsx`
+- `src/pages/` (Dashboard.jsx, Transfer.jsx, AccountManager.jsx, AdminDashboard.jsx)
+- `src/components/` (Navbar, Sidebar, Quick Transfer UI)
+- `src/contexts/` (AuthContext, NotificationApiContext)
+- `src/services/api.js` — central API wrapper (authAPI, accountsAPI, transactionsAPI)
+
+4. Authentication & Security (theme)
+-----------------------------------
+- JWT-based authentication: token contains user id, role, expiry.
+- Frontend stores token (localStorage) and includes `Authorization: Bearer <token>` header.
+- Server-side dependencies validate tokens and admin role for protected routes.
+- Use idempotency keys for operations that cause state changes (transfers, refunds).
+
+5. Data Model (theme)
+---------------------
+- User: id, username, email, hashed_password, role, kyc_approved
+- Account: id, account_number, account_type, balance, user_id, status
+- Transaction: id, src_account, dest_account, amount, status, timestamp, (src_user_name/dest_user_name)
+- Notification / AuditLog / ApprovalNotification: support asynchronous notifications & auditing
+
+6. APIs (theme)
+---------------
+Auth
+- POST `/auth/register` — register
+- POST `/auth/login` — login (returns token)
+- GET `/auth/me` — current user
+
+Accounts
+- POST `/accounts/create` — request account creation
+- POST `/accounts/approve` — admin approves account
+- GET `/accounts/me` — list of user's accounts
+- GET `/accounts/user/{user_id}` — other user's accounts for transfers
+
+Transactions
+- POST `/transactions/initiate` — canonical transaction creation (use idempotency key)
+- GET `/transactions/me` — user's transactions
+
+Admin
+- GET `/admin/users`, POST `/admin/approve-kyc`, GET `/admin/accounts`
+
+Notifications
+- WS endpoint `/ws?token=<jwt>` for real-time push
+- REST endpoints to fetch/mark/delete notifications
+
+7. Event-Driven Flows & Workflows (theme)
+----------------------------------------
+Transfer flow
+- User calls `/transactions/initiate` → Gateway publishes `transaction.initiated` to RabbitMQ.
+- Celery worker consumes, acquires distributed/row lock, updates balances within a DB transaction, creates Transaction record, indexes logs (Elasticsearch), and publishes `transaction.success`.
+- Notification service forwards an in-app WebSocket notification.
+
+Deposit/Statements/KYC
+- Deposit: `deposit.requested` → worker updates ledger, publishes `deposit.completed`.
+- Monthly statements: cron triggers worker → generate PDF, upload to storage, index metadata in ES, notify user.
+- KYC: user uploads documents, gateway publishes `kyc.review` → KYC worker validates and publishes `kyc.status_changed`.
+
+8. Messaging & Reliability (theme)
+---------------------------------
+RabbitMQ
+- Exchanges: topic/fanout/direct to route events like `transaction.*`, `kyc.*`, `notify.user.<id>`.
+- Use durable queues and persistent messages for resilience.
+- Implement DLQ (dead-letter queue) for repeatedly failing messages and a retry policy.
+
+Idempotency & Locks
+- Workers should check idempotency keys before processing.
+- Use Postgres row locks or Redis distributed locks to prevent double-spend.
+
+9. Notifications & WebSockets (theme)
+------------------------------------
+- The backend writes events to RabbitMQ; `rabbitmq_ws_listener.py` reads and forwards to `websocket_manager`.
+- Frontend opens WS using `ws://host:8000/ws?token=<jwt>` and receives JSON messages.
+- NotificationApiContext handles reconnection/backoff and shows toasts; permission for browser push is requested only via user action.
+
+10. Code Samples (theme)
+------------------------
+Node.js publisher (RabbitMQ): see `docs/project_corpus.txt` sample `publish-transfer.js`.
+Python Celery worker: see `docs/project_corpus.txt` `tasks.py` sample for `process_transfer`.
+WebSocket client examples (browser + node) present in `docs/project_corpus.txt`.
+
+11. Dev Setup & Run Commands (theme)
+-----------------------------------
+Backend (Windows PowerShell)
+```powershell
+python -m venv .venv
+& ".\.venv\Scripts\Activate.ps1"
+pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Celery (if used)
+```powershell
+celery -A app.celery_app worker --loglevel=info
+```
+RabbitMQ & Postgres: ensure services running and `RABBITMQ_URL`, `DATABASE_URL` env vars set.
+
+12. Troubleshooting & Debugging (theme)
+-------------------------------------
+Quick checks
+- If WS not connecting: check `rabbitmq_ws_listener` and WS manager, ensure correct token.
+- If Celery tasks not executing: `celery -A app.celery_app status` and inspect logs.
+- If transfers fail: check queue lengths, worker exceptions, Postgres locks.
+Useful commands
+- `rabbitmqctl list_queues`, `rabbitmqctl list_exchanges`, `rabbitmqctl list_bindings` (on RabbitMQ host)
+- `celery -A app.celery_app inspect active` (see active tasks)
+- Postgres: query `pg_locks` to find blocking queries.
+
+13. Elasticsearch & Logging (theme)
+----------------------------------
+- Index structured logs and transactions to ES for fast admin dashboards.
+- Example: `es.index(index='transactions', id=txn.id, document=doc)`
+- Use ES aggregations for trends, fraud alerts, and analytics.
+
+14. Admin Features (theme)
+--------------------------
+- KYC approvals, account approvals, card/loan approvals, manual balance adjustments, forensic logs.
+- Admin UI reads analytics from ES and performs authoritative actions via admin API endpoints.
+- Client-side role checks (`user.role === 'admin'`) avoid noisy 403s but server enforces authorization.
+
+15. QA / Training Pairs (theme)
+-------------------------------
+- `docs/qa_dataset.jsonl` contains extracted Q/A pairs (runbook-style) for chatbot training.
+- Example pairs: registration, transaction creation, RabbitMQ role, idempotency, WebSocket flow, mentor info.
+
+16. Team & Credits (theme)
+--------------------------
+- Project Mentor: Anusha Mahanthi
+- Key contributors (as recorded): Shaik Mohammed Omar, Hansika Aredla, Srihitha, Anirudha, Jinal Thakkar, Vignesh Reddy
+
+17. Changelog (theme)
+---------------------
+- 2025-12-06: Added event-driven reference, code samples, JSON schemas, and troubleshooting guidance.
+- 2025-12-06: Created QA dataset `docs/qa_dataset.jsonl` and added Project Mentor.
+
+18. Next Steps & Options (theme)
+--------------------------------
+- Generate an expanded JSONL QA dataset with paraphrases and categories.
+- Create smaller per-theme files (e.g., `docs/theme/api.md`, `docs/theme/dev.md`).
+- Run live smoke tests: start backend + frontend and test transfer + notification flows.
+
+If you want a different theme split, or separate files per theme, tell me which themes to split into and I’ll create them as separate documents under `docs/themes/`.

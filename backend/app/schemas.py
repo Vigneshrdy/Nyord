@@ -150,6 +150,8 @@ class TransactionOut(BaseModel):
     src_card_id: Optional[int] = None
     dest_card_id: Optional[int] = None
     transaction_type: str = "account_to_account"
+    src_user_name: Optional[str] = None
+    dest_user_name: Optional[str] = None
 
     class Config:
         from_attributes = True

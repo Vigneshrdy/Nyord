@@ -123,7 +123,7 @@ const LandingPage = () => {
             {[
               { icon: 'flash_on', title: 'Instant Transfers', desc: 'Send money instantly to anyone, anywhere in the world' },
               { icon: 'account_balance_wallet', title: 'Digital Wallet', desc: 'Secure digital wallet with contactless payments' },
-              { icon: 'trending_up', title: 'Investment Tools', desc: 'Invest in stocks, FDs, and more with expert guidance' },
+              { icon: 'trending_up', title: 'Accounts & Investments', desc: 'Manage accounts, FDs, and investment tools with ease' },
               { icon: 'security', title: 'Bank-level Security', desc: '256-bit encryption and biometric authentication' },
               { icon: 'insights', title: 'Smart Analytics', desc: 'AI-powered insights to manage your finances better' },
               { icon: 'support_agent', title: '24/7 Support', desc: 'Get help anytime with our dedicated support team' },
@@ -211,7 +211,7 @@ const LandingPage = () => {
                 <li><Link to="/cards" className="hover:text-white transition-colors">Cards</Link></li>
                 <li><Link to="/loans" className="hover:text-white transition-colors">Loans</Link></li>
                 <li><Link to="/fixed-deposits" className="hover:text-white transition-colors">Fixed Deposits</Link></li>
-                <li><Link to="/stocks" className="hover:text-white transition-colors">Investments</Link></li>
+                <li><Link to="/accounts" className="hover:text-white transition-colors">Accounts</Link></li>
               </ul>
             </div>
             

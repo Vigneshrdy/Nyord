@@ -9,7 +9,7 @@ import CardApprovalDashboard from '../components/CardApprovalDashboard';
 import AccountApprovals from '../components/AccountApprovals';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const location = useLocation();
   const [stats, setStats] = useState(null);
@@ -42,14 +42,15 @@ const AdminDashboard = () => {
     }
   }, [location.pathname]);
 
-  // Refresh data when specific tabs become active
+  // Refresh data when specific tabs become active (only for admins)
   useEffect(() => {
+    if (!user || user.role !== 'admin') return;
     if (activeTab === 'transactions') {
       refreshTransactions();
     } else if (activeTab === 'users' || activeTab === 'accounts') {
       loadAdminData();
     }
-  }, [activeTab]);
+  }, [activeTab, user]);
 
   const refreshTransactions = async () => {
     try {
@@ -105,8 +106,10 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    loadAdminData();
-  }, []);
+    if (user && user.role === 'admin') {
+      loadAdminData();
+    }
+  }, [user]);
 
   const loadAdminData = async () => {
     try {
@@ -1141,7 +1144,8 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
 
         {/* Accounts Tab - Comprehensive Financial Overview */}
         {activeTab === 'accounts' && (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
             {/* Account Approvals Section */}
             <AccountApprovals />
             
@@ -1470,6 +1474,63 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                   </div>
                 )}
               </div>
+            </div>
+            </div>
+
+            {/* Sidebar for Admin - Quick Transfers + small widgets */}
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm overflow-hidden">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Transfers</h3>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    onClick={() => window.location.assign('/transfer')}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                  >
+                    Money Transfer
+                  </button>
+
+                  <button
+                    onClick={() => window.location.assign('/qr-payment')}
+                    className="inline-flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    QR Transfer
+                  </button>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Recent Transaction Users</p>
+                  {transactionsWithUsers && transactionsWithUsers.length > 0 ? (
+                    <div className="flex flex-wrap gap-3 max-h-28 overflow-auto">
+                      {transactionsWithUsers.slice(0, 5).map((t, idx) => (
+                            <button
+                              key={t.id || idx}
+                              type="button"
+                              onClick={() => {
+                                const recipient = (t.srcUser && t.srcUser.id && t.srcUser.id === user.id) ? t.destUser : t.srcUser;
+                                if (recipient) {
+                                  navigate('/transfer', { state: { recipientUser: recipient } });
+                                } else {
+                                  // fallback: open transfer page
+                                  navigate('/transfer');
+                                }
+                              }}
+                              className="flex flex-col items-center text-center w-20 focus:outline-none"
+                            >
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${idx % 2 === 0 ? 'bg-red-500' : 'bg-blue-500'}`}>
+                                {((t.srcUser?.full_name || t.destUser?.full_name) || (t.srcUser?.username || t.destUser?.username) || 'U').toString().charAt(0).toUpperCase()}
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate w-full">{(t.srcUser?.full_name || t.destUser?.full_name) || (t.srcUser?.username || t.destUser?.username) || 'Unknown'}</div>
+                            </button>
+                          ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">No recent transactions</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Optional small widgets could be added here (Totals, Spending) */}
             </div>
           </div>
         )}

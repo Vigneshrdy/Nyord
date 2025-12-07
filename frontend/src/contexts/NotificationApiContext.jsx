@@ -84,8 +84,9 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // Setup WebSocket connection
+  // Setup WebSocket connection with reconnect logic
   useEffect(() => {
+    let mounted = true;
     const token = getToken();
     if (!user || !token) {
       console.log('No user or token available for WebSocket connection');
@@ -93,14 +94,30 @@ export function NotificationProvider({ children }) {
     }
 
     console.log('Setting up WebSocket connection for user:', user.id);
-    const websocket = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws?token=${token}`);
-    
-    websocket.onopen = () => {
-      console.log('WebSocket connected for notifications, user:', user.id);
-      websocket.send(JSON.stringify({ type: 'subscribe_notifications' }));
-    };
 
-    websocket.onmessage = (event) => {
+    let websocket = null;
+    let reconnectTimer = null;
+
+    const connect = () => {
+      if (!mounted) return;
+      try {
+        websocket = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws?token=${token}`);
+      } catch (err) {
+        console.error('Failed to construct WebSocket:', err);
+        scheduleReconnect();
+        return;
+      }
+
+      websocket.onopen = () => {
+        console.log('WebSocket connected for notifications, user:', user.id);
+        try {
+          websocket.send(JSON.stringify({ type: 'subscribe_notifications' }));
+        } catch (err) {
+          console.error('Failed to send subscribe message:', err);
+        }
+      };
+
+      websocket.onmessage = (event) => {
       console.log('WebSocket message received:', event.data);
       try {
         const data = JSON.parse(event.data);
@@ -150,27 +167,41 @@ export function NotificationProvider({ children }) {
       }
     };
 
-    websocket.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        // force close to trigger onclose and reconnection flow
+        try { websocket.close(); } catch (_) {}
+      };
+
+      websocket.onclose = (event) => {
+        console.log('WebSocket disconnected, code:', event.code, 'reason:', event.reason);
+        if (!mounted) return;
+        // Reconnect after delay unless closed intentionally (1000)
+        if (event.code !== 1000 && user && getToken()) {
+          scheduleReconnect();
+        }
+      };
+
+      setWs(websocket);
     };
 
-    websocket.onclose = (event) => {
-      console.log('WebSocket disconnected, code:', event.code, 'reason:', event.reason);
-      
-      // Try to reconnect after 5 seconds if connection was lost unexpectedly
-      if (event.code !== 1000 && user && getToken()) {
-        setTimeout(() => {
-          console.log('Attempting to reconnect WebSocket...');
-          // This will trigger the useEffect again
-        }, 5000);
-      }
+    const scheduleReconnect = () => {
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        console.log('Attempting to reconnect WebSocket...');
+        connect();
+      }, 5000);
     };
 
-    setWs(websocket);
+    connect();
 
     return () => {
-      console.log('Closing WebSocket connection');
-      websocket.close();
+      mounted = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (websocket) {
+        try { websocket.close(1000, 'closing'); } catch (_) {}
+      }
     };
   }, [user]);
 
@@ -183,11 +214,9 @@ export function NotificationProvider({ children }) {
   }, [user]);
 
   // Request notification permission
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+  // We do not automatically prompt for Notification permission on page load
+  // to avoid unexpected browser permission popups. Permission should be
+  // requested from a user action (settings/opt-in) when appropriate.
 
   const markAsRead = async (notificationId) => {
     const token = getToken();

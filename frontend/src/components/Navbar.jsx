@@ -196,23 +196,19 @@ const getNavigationLinks = (user) => [
   {
     name: "Menu",
     items: [
-      ...(user?.role === 'admin' 
+      ...(user?.role === 'admin'
         ? [
             { href: "/admin", label: "Overview" },
             { href: "/admin/kyc", label: "KYC Approval" },
-            { href: "/admin/loans", label: "Loans" },
-            { href: "/admin/cards", label: "Cards" },
-            { href: "/admin/users", label: "Users" },
-            { href: "/admin/transactions", label: "Transactions" },
-            { href: "/admin/accounts", label: "Accounts" }
+            { href: "/admin/loans", label: "Loan Approvals" },
+            { href: "/admin/cards", label: "Card Approvals" },
+            { href: "/admin/users", label: "Users" }
           ]
         : [
             { href: "/dashboard", label: "Dashboard" },
-            { href: "/qr-payment", label: "QR Payment" },
-            { href: "/cards", label: "Cards" },
+            { href: "/accounts", label: "Accounts" },
             { href: "/statements", label: "Statements" },
-            { href: "/loans", label: "Loans" },
-            { href: "/fixed-deposits", label: "Fixed Deposits" },
+            { href: "/loans", label: "Loans" }
           ]
       ),
       { href: "/notifications", label: "Notifications" },

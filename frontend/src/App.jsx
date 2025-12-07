@@ -5,8 +5,12 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import CustomNavbar from './components/CustomNavbar';
 import SidebarNavigation from './components/SidebarNavigation';
 import InteractiveMenu from './components/InteractiveMenu';
+import NotificationContainer from './components/NotificationContainer';
+import NotificationTester from './components/NotificationTester';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
+import { useServiceWorkerNavigation, serviceWorkerManager } from './services/serviceWorkerManager';
+import { useEffect } from 'react';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
 import AuthContainer from './components/AuthContainer';
@@ -24,13 +28,15 @@ import Notifications from './pages/Notifications';
 import QRPayment from './pages/QRPayment';
 import PaymentPage from './pages/PaymentPage';
 import Feedback from './pages/Feedback';
-import Stocks from './pages/Stocks';
 import NotFound from './pages/NotFound';
 
 // Layout wrapper component to handle conditional sidebar
 function LayoutWrapper({ children }) {
   const { user } = useAuth();
   const location = useLocation();
+  
+  // Enable service worker navigation
+  useServiceWorkerNavigation();
   
   // Pages that should not have sidebar navigation
   const noSidebarPages = ['/', '/signin', '/signup', '/forgot-password', '/pay'];
@@ -61,11 +67,18 @@ function LayoutWrapper({ children }) {
 }
 
 function App() {
+  // Register service worker on app load
+  useEffect(() => {
+    serviceWorkerManager.register();
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>
         <Router>
           <NotificationProvider>
+            <NotificationContainer />
+            <NotificationTester />
             <LayoutWrapper>
             <Routes>
               <Route path="/" element={<LandingPage />} />
@@ -169,11 +182,7 @@ function App() {
                 <QRPayment />
               </ProtectedRoute>
             } />
-            <Route path="/stocks" element={
-              <ProtectedRoute>
-                <Stocks />
-              </ProtectedRoute>
-            } />
+            {/* Stocks page removed - replaced by Accounts */}
               <Route path="/pay" element={<PaymentPage />} />
               {/* Catch-all route for 404 */}
               <Route path="*" element={<NotFound />} />

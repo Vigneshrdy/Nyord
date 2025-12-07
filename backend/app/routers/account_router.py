@@ -182,41 +182,29 @@ def transfer_between_accounts(
     if from_account.balance < amount:
         raise HTTPException(status_code=400, detail="Insufficient balance")
     
-    # Perform transfer
+    # Perform transfer (update balances)
     from_account.balance -= amount
     to_account.balance += amount
-    
-    # Create transaction records
-    debit_transaction = models.Transaction(
-        transaction_id=f"TXN{random.randint(100000, 999999)}",
-        amount=-amount,
-        transaction_type="transfer_out",
-        description=f"Transfer to account {to_account.account_number}",
-        account_id=from_account.id,
-        created_at=datetime.utcnow()
-    )
-    
-    credit_transaction = models.Transaction(
-        transaction_id=f"TXN{random.randint(100000, 999999)}",
+
+    # Create a single transaction record representing this transfer
+    txn = models.Transaction(
+        src_account=from_account.id,
+        dest_account=to_account.id,
         amount=amount,
-        transaction_type="transfer_in",
-        description=f"Transfer from account {from_account.account_number}",
-        account_id=to_account.id,
-        created_at=datetime.utcnow()
+        status="SUCCESS"
     )
-    
-    db.add(debit_transaction)
-    db.add(credit_transaction)
-    
+
+    db.add(txn)
+
     # Log the transfer
     audit_log = models.AuditLog(
         event_type="INTER_ACCOUNT_TRANSFER",
         message=f"User {current_user.username} transferred ${amount} from {from_account.account_number} to {to_account.account_number}"
     )
     db.add(audit_log)
-    
+
     db.commit()
-    
+
     return {
         "message": "Transfer completed successfully",
         "from_account": from_account.account_number,
@@ -224,7 +212,7 @@ def transfer_between_accounts(
         "amount": amount,
         "from_balance": from_account.balance,
         "to_balance": to_account.balance,
-        "transaction_ids": [debit_transaction.transaction_id, credit_transaction.transaction_id]
+        "transaction_id": txn.id
     }
 
 @router.get("/my-approved", response_model=list[schemas.AccountOut])

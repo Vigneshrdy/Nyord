@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, Check } from 'lucide-react';
+    import { Bell, X, Check, Smartphone } from 'lucide-react';
 import notificationService from '../services/notificationService';
+import { pushNotificationManager } from '../services/pushNotificationService';
 
 const NotificationPermissionBanner = () => {
   const [show, setShow] = useState(false);
   const [permission, setPermission] = useState('default');
+  const [isEnabling, setIsEnabling] = useState(false);
 
   useEffect(() => {
     const checkPermission = () => {
@@ -15,19 +17,31 @@ const NotificationPermissionBanner = () => {
       }
     };
 
+    // Initialize push notification manager
+    pushNotificationManager.initialize();
     checkPermission();
   }, []);
 
   const requestPermission = async () => {
-    const result = await notificationService.requestPermission();
-    setPermission(result);
-    
-    if (result === 'granted') {
-      setShow(false);
-      // Show test notification
-      notificationService.showAccountNotification('Notifications enabled! You\'ll now receive real-time updates.', 'success');
-    } else if (result === 'denied') {
-      setShow(false);
+    setIsEnabling(true);
+    try {
+      const result = await notificationService.requestPermission();
+      setPermission(result);
+      
+      if (result === 'granted') {
+        // Subscribe to push notifications for device alerts
+        await pushNotificationManager.subscribe();
+        
+        setShow(false);
+        // Show test notification
+        notificationService.showAccountNotification('Notifications enabled! You\'ll now receive real-time updates on screen and device alerts.', 'success');
+      } else if (result === 'denied') {
+        setShow(false);
+      }
+    } catch (error) {
+      console.error('Error enabling notifications:', error);
+    } finally {
+      setIsEnabling(false);
     }
   };
 
@@ -54,15 +68,27 @@ const NotificationPermissionBanner = () => {
         <div className="flex-1">
           <h3 className="font-semibold text-sm mb-1">Enable Notifications</h3>
           <p className="text-sm opacity-90 mb-3">
-            Get real-time alerts for transactions, account updates, and important banking notifications directly on your device.
+            Get real-time alerts for transactions, account updates, and important banking notifications. 
+            Includes both on-screen popups and device push notifications.
           </p>
           <div className="flex gap-2">
             <button
               onClick={requestPermission}
-              className="bg-white text-teal-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2"
+              disabled={isEnabling}
+              className="bg-white text-teal-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Check size={16} />
-              Enable Notifications
+              {isEnabling ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-teal-600 border-t-transparent"></div>
+                  Enabling...
+                </>
+              ) : (
+                <>
+                  <Check size={16} />
+                  <Smartphone size={16} />
+                  Enable Notifications
+                </>
+              )}
             </button>
             <button
               onClick={dismiss}

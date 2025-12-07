@@ -26,7 +26,8 @@ import {
   HelpCircle,
   MessageCircle,
   Sun,
-  Moon
+  Moon,
+  icons
 } from 'lucide-react';
 
 // Sidebar Context
@@ -189,23 +190,36 @@ const SidebarNavigation = () => {
     navigate('/signin');
   };
 
-  // Navigation items for regular users
-  const userNavigationItems = [
-    { href: "/dashboard", label: "Dashboard", icon: <Home size={24} /> },
-    { href: "/transfer", label: "Transfer Money", icon: <CreditCard size={24} /> },
-    { href: "/qr-payment", label: "QR Payment", icon: <QrCode size={24} /> },
-    { href: "/cards", label: "Cards", icon: <CreditCard size={24} /> },
-    { href: "/statements", label: "Statements", icon: <FileText size={24} /> },
-    { href: "/loans", label: "Loans", icon: <Building size={24} /> },
-    { href: "/fixed-deposits", label: "FDs", icon: <TrendingUp size={24} /> },
+  // Role-based navigation items (admin vs user)
+  const navItems = [
+    ...(user?.role === 'admin'
+      ? [
+          { href: "/admin", label: "Overview", icon: <BarChart3 size={24} /> },
+          { href: "/admin/kyc", label: "KYC Approval", icon: <ShieldCheck size={24} /> },
+          { href: "/admin/loans", label: "Loan Approvals", icon: <TrendingUp size={24} /> },
+          { href: "/admin/cards", label: "Card Approvals", icon: <CreditCard size={24} /> },
+          { href: "/admin/accounts", label: "Account approvals",icon: <Building2 size={24} /> },
+          { href: "/admin/transactions", label: "Transactions",icon: <CreditCard size={24} /> },
+          { href: "/admin/users", label: "Users", icon: <Users size={24} /> }
+        ]
+      : [
+          { href: "/dashboard", label: "Dashboard", icon: <Home size={24} /> },
+          { href: "/accounts", label: "Accounts", icon: <Building2 size={24} /> },
+          { href: "/transfer", label: "Transfer Money", icon: <CreditCard size={24} /> },
+          { href: "/qr-payment", label: "QR Payment", icon: <QrCode size={24} /> },
+          { href: "/cards", label: "Cards", icon: <CreditCard size={24} /> },
+          { href: "/statements", label: "Statements", icon: <FileText size={24} /> },
+          { href: "/loans", label: "Loans", icon: <Building size={24} /> },
+          { href: "/fixed-deposits", label: "FDs", icon: <TrendingUp size={24} /> }
+        ]),
+    // Common links
     { href: "/notifications", label: "Notifications", icon: <Bell size={24} /> },
-    { href: "/stocks", label: "Live Charts", icon: <BarChart3 size={24} /> },
+    { href: "/profile", label: "Settings", icon: <Settings size={24} /> }
   ];
 
-  // Secondary navigation items
+  // Secondary navigation items (help + theme)
   const secondaryItems = [
-    { href: "/profile", label: "Settings/Profile", icon: <Settings size={24} /> },
-    { href: "/help", label: "Help", icon: <HelpCircle size={24} /> },
+    { href: "/help", label: "Help", icon: <HelpCircle size={24} /> }
   ];
 
   const userInitials = user?.username ? user.username.substring(0, 2).toUpperCase() : 'U';
@@ -228,7 +242,7 @@ const SidebarNavigation = () => {
 
           {/* Main Menu */}
           <div className="mt-8 flex flex-col gap-2">
-            {userNavigationItems.map((item, idx) => (
+            {navItems.map((item, idx) => (
               <SidebarLink
                 key={idx}
                 link={item}
@@ -251,13 +265,13 @@ const SidebarNavigation = () => {
             ))}
             
             {/* Theme Toggle */}
-            <button
+            {/* <button
               onClick={toggleTheme}
               className="flex items-center gap-3 py-3 px-3 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-all text-neutral-700 dark:text-neutral-200 text-base"
             >
               {theme === 'light' ? <Moon size={24} /> : <Sun size={24} />}
               <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
-            </button>
+            </button> */}
           </div>
         </div>
 

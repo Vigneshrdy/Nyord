@@ -144,19 +144,27 @@ const AccountStatements = () => {
       let type = 'debit';
       let description = `Transfer`;
       
-      if (isCredit && !isDebit) {
+        if (isCredit && !isDebit) {
         type = 'credit';
         runningBalance += txn.amount || 0;
         const srcAcc = accountMap[txn.src_account];
-        const srcUser = srcAcc?.user_id ? userMap[srcAcc.user_id] : null;
-        const userName = srcUser?.full_name || srcUser?.username || 'Unknown User';
+        // Prefer server-provided username if available, otherwise fall back to userMap lookup
+        let userName = txn.src_user_name || null;
+        if (!userName) {
+          const srcUser = srcAcc?.user_id ? userMap[srcAcc.user_id] : null;
+          userName = srcUser?.full_name || srcUser?.username || 'Unknown User';
+        }
         description = `Received from ${userName}`;
       } else if (isDebit && !isCredit) {
         type = 'debit';
         runningBalance -= txn.amount || 0;
         const destAcc = accountMap[txn.dest_account];
-        const destUser = destAcc?.user_id ? userMap[destAcc.user_id] : null;
-        const userName = destUser?.full_name || destUser?.username || 'Unknown User';
+        // Prefer server-provided username if available, otherwise fall back to userMap lookup
+        let userName = txn.dest_user_name || null;
+        if (!userName) {
+          const destUser = destAcc?.user_id ? userMap[destAcc.user_id] : null;
+          userName = destUser?.full_name || destUser?.username || 'Unknown User';
+        }
         description = `Sent to ${userName}`;
       } else {
         // Internal transfer

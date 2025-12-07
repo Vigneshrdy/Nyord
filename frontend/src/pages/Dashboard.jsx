@@ -47,51 +47,19 @@ const Dashboard = () => {
       setError(null);
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
-      setError(err.message);
+      setError(err?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  // If user is admin, redirect to admin route
+  // Load dashboard data when user is available
   useEffect(() => {
-    if (user?.role === 'admin') {
-      navigate('/admin', { replace: true });
-      return;
-    }
-  }, [user, navigate]);
-
-  useEffect(() => {
-    fetchDashboardData();
-
-    // Listen for balance updates from WebSocket
-    const handleBalanceUpdate = (event) => {
-      console.log('Balance update received:', event.detail);
+    if (user) {
       fetchDashboardData();
-    };
+    }
+  }, [user]);
 
-    window.addEventListener('balanceUpdate', handleBalanceUpdate);
-
-    return () => {
-      window.removeEventListener('balanceUpdate', handleBalanceUpdate);
-    };
-  }, []);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showDropdown && !event.target.closest('.relative')) {
-        setShowDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showDropdown]);
-
-  // Real data from API with fallbacks
   const totalIncome = dashboardData?.monthly_income || 0.00;
   const totalExpenses = dashboardData?.monthly_expenses || 0.00;
   const cardBalance = dashboardData?.total_balance || 0.00;
@@ -188,15 +156,7 @@ const Dashboard = () => {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {/* <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
-            <Search size={20} className="text-gray-500 dark:text-gray-400" />
-          </button>
-          <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
-            <Download size={20} className="text-gray-500 dark:text-gray-400" />
-          </button>
-          <button className="p-2 bg-white dark:bg-gray-800 rounded-full shadow-sm hover:shadow-md transition-shadow">
-            <Calendar size={20} className="text-gray-500 dark:text-gray-400" />
-          </button> */}
+          
           <div className="relative">
             <button 
               onClick={() => setShowDropdown(!showDropdown)}
@@ -251,31 +211,7 @@ const Dashboard = () => {
                 </div>
               </div>
               
-              {/* Credit Card */}
-              <div className="relative">
-                <div className="w-72 h-44 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl p-6 text-white shadow-xl">
-                  <div className="flex items-center justify-between mb-8">
-                    <span className="font-semibold text-lg">Nyord</span>
-                    <div className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                      <div className="w-4 h-4 bg-white bg-opacity-30 rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-lg font-mono tracking-wider">
-                      {dashboardData?.accounts?.[0]?.account_number || "•••• •••• •••• ••••"}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm opacity-90">
-                        {user?.full_name || user?.username || "Card Holder"}
-                      </span>
-                      <div className="flex space-x-2">
-                        <div className="w-8 h-5 bg-red-500 rounded-full opacity-80"></div>
-                        <div className="w-8 h-5 bg-yellow-500 rounded-full opacity-80 -ml-3"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Quick Transfer Panel removed from here; moved to sidebar */}
             </div>
 
             {/* Investment Performance */}
@@ -347,7 +283,12 @@ const Dashboard = () => {
                     }`}>
                       {transaction.type === 'credit' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
                     </div>
-                    <span className="font-medium text-gray-900 dark:text-white">{transaction.description}</span>
+                    <div>
+                      <span className="font-medium text-gray-900 dark:text-white">{transaction.description}</span>
+                      {transaction.userName && (
+                        <div className="text-xs text-gray-500">{transaction.userName}</div>
+                      )}
+                    </div>
                   </div>
                   <span className="w-24 text-sm text-gray-500">{transaction.account}</span>
                   <span className={`w-24 text-right font-semibold ${
@@ -365,7 +306,7 @@ const Dashboard = () => {
                 Recent Transfer
               </button>
               <button 
-                onClick={() => navigate('/account-statements')}
+                onClick={() => navigate('/statements')}
                 className="text-sm text-teal-600 hover:text-teal-700 font-medium"
               >
                 View Full Transaction History →
@@ -409,45 +350,51 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Quick Transfer */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Quick Transfer</h3>
-              <Search size={16} className="text-gray-400" />
+          {/* Right sidebar quick transfer: moved here above Spending Overview */}
+
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Transfers</h3>
+
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                onClick={() => navigate('/transfer')}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+              >
+                <Send size={16} />
+                Money Transfer
+              </button>
+
+              <button
+                onClick={() => navigate('/qr-payment')}
+                className="inline-flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <Building size={16} />
+                QR Transfer
+              </button>
             </div>
 
-            <div className="flex items-center gap-4 mb-4">
-              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                <Building size={20} className="text-gray-600 dark:text-gray-400" />
-              </button>
-              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                <Wallet size={20} className="text-gray-600 dark:text-gray-400" />
-              </button>
-              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                <Send size={20} className="text-gray-600 dark:text-gray-400" />
-              </button>
-              <button className="p-3 bg-gray-100 dark:bg-gray-700 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                <MoreHorizontal size={20} className="text-gray-600 dark:text-gray-400" />
-              </button>
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Recent Transaction Users</p>
+                    {recentTransactions && recentTransactions.length > 0 ? (
+                      <div className="flex items-center gap-3">
+                        {recentTransactions.slice(0, 5).map((t, idx) => (
+                          <button
+                            key={t.id || idx}
+                            type="button"
+                            onClick={() => navigate(`/transfer?recipient=${encodeURIComponent(t.userName || t.description || '')}`)}
+                            className="flex flex-col items-center text-center focus:outline-none"
+                          >
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${idx % 2 === 0 ? 'bg-red-500' : 'bg-blue-500'}`}>
+                              { (t.userName || t.description || 'U').toString().charAt(0).toUpperCase() }
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate w-20">{t.userName || t.description || 'Unknown'}</div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">No recent transactions</div>
+                    )}
             </div>
-
-            <p className="text-sm text-gray-500 mb-3">Recent User Transfer</p>
-            <div className="flex justify-between items-center mb-4">
-              {quickTransferContacts.map((contact, index) => (
-                <button
-                  key={index}
-                  className={`w-10 h-10 rounded-full ${contact.color} flex items-center justify-center text-white text-sm font-medium hover:scale-110 transition-transform`}
-                >
-                  {contact.name.charAt(0)}
-                </button>
-              ))}
-            </div>
-
-            <button 
-              onClick={() => navigate('/transfer')}
-              className="w-full bg-gray-900 dark:bg-gray-700 text-white py-3 rounded-xl font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors">
-              Quick Transfer Now
-            </button>
           </div>
 
           {/* Spending Overview */}

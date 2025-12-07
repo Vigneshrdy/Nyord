@@ -1,6 +1,6 @@
 import React from 'react';
 
 export default function MultiLiveCharts() {
-  // Stocks feature removed — component placeholder
+  // Removed stocks charts — placeholder component
   return null;
 }

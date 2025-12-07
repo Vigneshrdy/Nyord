@@ -15,7 +15,7 @@ import {
 } from '../components/ui/dropdown-menu';
 
 // Admin Navigation Buttons Component
-const AdminNavigationButtons = ({ isLandingPage, isActive }) => {
+const AdminNavigationButtons = ({ isLandingPage, isActive, location }) => {
   return (
     <div className="hidden md:flex items-center gap-2">
       <Link
@@ -414,9 +414,19 @@ const CustomNavbar = () => {
 
           {/* Navigation Section */}
           <div className="flex items-center gap-4">
+            {user && (
+              <div className="hidden md:flex mr-4">
+                {user.role === 'admin' ? (
+                  <AdminNavigationButtons isLandingPage={isLandingPage} isActive={isActive} location={location} />
+                ) : (
+                  <CustomerNavigationButtons isLandingPage={isLandingPage} isActive={isActive} />
+                )}
+              </div>
+            )}
+
             {user ? (
               <>
-                {/* User Profile */}
+                <NotificationComponent isLandingPage={isLandingPage} />
                 <UserProfileDropdown isLandingPage={isLandingPage} />
               </>
             ) : (
