@@ -248,3 +248,50 @@ def get_account_balance(
         "account_type": account.account_type,
         "balance": account.balance
     }
+
+@router.get("/qr-codes/all")
+def get_all_account_qr_codes(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Get QR codes for all approved accounts (like UPI - one QR per account)"""
+    from ..qr_utils import generate_account_qr_code
+    
+    # Get all approved accounts for the user
+    accounts = db.query(models.Account).filter(
+        models.Account.user_id == current_user.id,
+        models.Account.status == "approved"
+    ).all()
+    
+    if not accounts:
+        raise HTTPException(status_code=404, detail="No approved accounts found")
+    
+    # Generate QR code for each account
+    qr_codes = []
+    for account in accounts:
+        account_data = {
+            "account_number": account.account_number,
+            "user_name": current_user.full_name or current_user.username,
+            "account_type": account.account_type
+        }
+        
+        qr_code = generate_account_qr_code(
+            account_id=account.id,
+            account_data=account_data,
+            base_url="http://localhost:3000"
+        )
+        
+        qr_codes.append({
+            "account_id": account.id,
+            "account_number": account.account_number,
+            "account_type": account.account_type,
+            "balance": account.balance,
+            "qr_code": qr_code
+        })
+    
+    return {
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "full_name": current_user.full_name,
+        "accounts": qr_codes
+    }

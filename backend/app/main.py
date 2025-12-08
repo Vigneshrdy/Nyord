@@ -13,6 +13,7 @@ from .routers import users_router
 from .routers import admin_router
 from .routers import notification_router
 from .routers import qr_router
+from .routers import account_qr_router
 from .routers import push_router
 from .routers import stats_router
 import threading

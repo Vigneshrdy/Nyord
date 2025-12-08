@@ -94,3 +94,78 @@ def verify_qr_code(qr_data: str, expected_user_id: int) -> bool:
         return parsed_data.get("user_id") == expected_user_id and parsed_data.get("app") == "Nyord Banking"
     except (json.JSONDecodeError, KeyError):
         return False
+
+def generate_account_qr_code(account_id: int, account_data: dict = None, base_url: str = "http://localhost:3000") -> str:
+    """
+    Generate a unique QR code for a bank account (similar to UPI).
+    Each account gets its own QR code for receiving payments.
+    
+    Args:
+        account_id: The account's unique ID
+        account_data: Optional dictionary with account info
+        base_url: Base URL of the frontend application
+    
+    Returns:
+        Base64 encoded PNG image of the QR code
+    """
+    # Generate secure hash for the account
+    account_hash = generate_account_qr_hash(account_id)
+    
+    # Create payment URL that works with external scanners
+    payment_url = f"{base_url}/pay?account={account_id}&hash={account_hash}"
+    
+    # Add account info as URL parameters for better UX
+    if account_data:
+        if account_data.get("account_number"):
+            payment_url += f"&acc_num={account_data['account_number']}"
+        if account_data.get("user_name"):
+            payment_url += f"&name={account_data['user_name'].replace(' ', '%20')}"
+        if account_data.get("account_type"):
+            payment_url += f"&type={account_data['account_type']}"
+    
+    # QR content is the payment URL
+    qr_content = payment_url
+    
+    # Create QR code with specific settings for consistency
+    qr = qrcode.QRCode(
+        version=1,  # Controls size
+        error_correction=qrcode.constants.ERROR_CORRECT_M,  # Medium error correction
+        box_size=10,  # Size of each box in pixels
+        border=4,  # Border size in boxes
+    )
+    
+    qr.add_data(qr_content)
+    qr.make(fit=True)
+    
+    # Create image
+    qr_image = qr.make_image(
+        fill_color="black",
+        back_color="white"
+    )
+    
+    # Convert to base64 string
+    img_buffer = io.BytesIO()
+    qr_image.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    
+    # Encode to base64
+    img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+    
+    return f"data:image/png;base64,{img_base64}"
+
+def generate_account_qr_hash(account_id: int) -> str:
+    """
+    Generate a consistent hash for an account that can be used as QR identifier.
+    This will always produce the same hash for the same account_id.
+    
+    Args:
+        account_id: The account's unique ID
+    
+    Returns:
+        SHA256 hash string
+    """
+    # Use a salt with account_id for consistent hashing
+    salt = "nyord_account_qr_2024"
+    data = f"{salt}_{account_id}_{salt}"
+    
+    return hashlib.sha256(data.encode()).hexdigest()

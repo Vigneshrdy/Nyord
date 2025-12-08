@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { profileAPI } from '../services/api';
-import QRCodeDisplay from '../components/QRCodeDisplay';
+import AccountQRCodes from '../components/AccountQRCodes';
 import ToastSave from '../components/ToastSave';
 
 const Profile = () => {
@@ -746,11 +746,11 @@ const Profile = () => {
             {/* QR Code Tab */}
             {activeTab === 'qrcode' && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">My QR Code</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Account QR Codes</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Your unique QR code contains your profile information and can be shared with trusted parties for quick identification.
+                  Each of your accounts has a unique QR code. Share the QR code of the specific account where you want to receive payments.
                 </p>
-                <QRCodeDisplay className="max-w-2xl" />
+                <AccountQRCodes className="max-w-3xl" />
               </div>
             )}
           </div>
