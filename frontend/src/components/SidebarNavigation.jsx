@@ -195,6 +195,7 @@ const SidebarNavigation = () => {
     ...(user?.role === 'admin'
       ? [
           { href: "/admin", label: "Overview", icon: <BarChart3 size={24} /> },
+          { href: "/admin/statistics", label: "Statistics", icon: <TrendingUp size={24} /> },
           { href: "/admin/kyc", label: "KYC Approval", icon: <ShieldCheck size={24} /> },
           { href: "/admin/loans", label: "Loan Approvals", icon: <TrendingUp size={24} /> },
           { href: "/admin/cards", label: "Card Approvals", icon: <CreditCard size={24} /> },

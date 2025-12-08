@@ -38,6 +38,8 @@ class User(Base):
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)
     emergency_contact_relation = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     accounts = relationship("Account", back_populates="owner", foreign_keys="[Account.user_id]")
     fixed_deposits = relationship("FixedDeposit", back_populates="owner", foreign_keys="[FixedDeposit.user_id]")
@@ -143,6 +145,7 @@ class Loan(Base):
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approval_date = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="loans", foreign_keys=[user_id])
 
@@ -169,6 +172,7 @@ class Card(Base):
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approval_date = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="cards", foreign_keys=[user_id])
 

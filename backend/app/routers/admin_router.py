@@ -566,3 +566,239 @@ async def approve_fixed_deposit(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing approval: {str(e)}")
+
+
+@router.get("/statistics/detailed")
+async def get_detailed_statistics(
+    admin_user: models.User = Depends(auth.get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get detailed statistics for charts and analytics"""
+    from datetime import datetime, timedelta
+    from sqlalchemy import extract, case
+    
+    # Get current date
+    today = datetime.now()
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+    
+    # Weekly stats
+    accounts_this_week = db.query(models.Account).filter(
+        models.Account.created_at >= week_ago
+    ).count()
+    
+    loans_this_week = db.query(models.Loan).filter(
+        models.Loan.created_at >= week_ago,
+        models.Loan.approval_status == "approved"
+    ).count()
+    
+    cards_this_week = db.query(models.Card).filter(
+        models.Card.created_at >= week_ago,
+        models.Card.approval_status == "approved"
+    ).count()
+    
+    # Monthly stats
+    accounts_this_month = db.query(models.Account).filter(
+        models.Account.created_at >= month_ago
+    ).count()
+    
+    loans_this_month = db.query(models.Loan).filter(
+        models.Loan.created_at >= month_ago,
+        models.Loan.approval_status == "approved"
+    ).count()
+    
+    cards_this_month = db.query(models.Card).filter(
+        models.Card.created_at >= month_ago,
+        models.Card.approval_status == "approved"
+    ).count()
+    
+    # Account types distribution
+    account_types = db.query(
+        models.Account.account_type,
+        func.count(models.Account.id).label('count')
+    ).group_by(models.Account.account_type).all()
+    
+    # Loan types distribution (approximation based on amount)
+    total_loans = db.query(models.Loan).filter(models.Loan.approval_status == "approved").count()
+    personal_loans = db.query(models.Loan).filter(
+        models.Loan.approval_status == "approved",
+        models.Loan.principal <= 50000
+    ).count()
+    auto_loans = db.query(models.Loan).filter(
+        models.Loan.approval_status == "approved",
+        models.Loan.principal > 50000,
+        models.Loan.principal <= 200000
+    ).count()
+    home_loans = db.query(models.Loan).filter(
+        models.Loan.approval_status == "approved",
+        models.Loan.principal > 200000
+    ).count()
+    
+    # Card types distribution
+    card_types = db.query(
+        models.Card.card_type,
+        func.count(models.Card.id).label('count')
+    ).group_by(models.Card.card_type).all()
+    
+    # Approval rates
+    total_accounts_req = db.query(models.Account).count()
+    approved_accounts = db.query(models.Account).filter(models.Account.status == "active").count()
+    
+    total_loans_req = db.query(models.Loan).count()
+    approved_loans = db.query(models.Loan).filter(models.Loan.approval_status == "approved").count()
+    
+    total_cards_req = db.query(models.Card).count()
+    approved_cards = db.query(models.Card).filter(models.Card.approval_status == "approved").count()
+    
+    # User growth (monthly for last 12 months)
+    user_growth = []
+    for i in range(11, -1, -1):
+        month_start = today.replace(day=1) - timedelta(days=30*i)
+        month_end = month_start + timedelta(days=30)
+        users = db.query(models.User).filter(
+            models.User.role == "customer",
+            models.User.created_at <= month_end
+        ).count()
+        active_users = db.query(models.User).filter(
+            models.User.role == "customer",
+            models.User.status == "approved",
+            models.User.created_at <= month_end
+        ).count()
+        user_growth.append({
+            "month": month_start.strftime("%b"),
+            "users": users,
+            "active": active_users
+        })
+    
+    # Daily accounts (last 7 days)
+    daily_accounts = []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day.replace(hour=23, minute=59, second=59, microsecond=999999)
+        count = db.query(models.Account).filter(
+            models.Account.created_at >= day_start,
+            models.Account.created_at <= day_end
+        ).count()
+        daily_accounts.append({
+            "day": day.strftime("%a"),
+            "accounts": count
+        })
+    
+    # Monthly data (last 12 months)
+    monthly_data = []
+    for i in range(11, -1, -1):
+        month_start = today.replace(day=1) - timedelta(days=30*i)
+        month_end = month_start + timedelta(days=30)
+        
+        accounts = db.query(models.Account).filter(
+            models.Account.created_at >= month_start,
+            models.Account.created_at < month_end
+        ).count()
+        
+        loans = db.query(models.Loan).filter(
+            models.Loan.approval_status == "approved",
+            models.Loan.created_at >= month_start,
+            models.Loan.created_at < month_end
+        ).count()
+        
+        cards = db.query(models.Card).filter(
+            models.Card.approval_status == "approved",
+            models.Card.created_at >= month_start,
+            models.Card.created_at < month_end
+        ).count()
+        
+        monthly_data.append({
+            "month": month_start.strftime("%b"),
+            "accounts": accounts,
+            "loans": loans,
+            "cards": cards
+        })
+    
+    return {
+        "weeklyStats": {
+            "accounts": accounts_this_week,
+            "loans": loans_this_week,
+            "cards": cards_this_week
+        },
+        "monthlyStats": {
+            "accounts": accounts_this_month,
+            "loans": loans_this_month,
+            "cards": cards_this_month
+        },
+        "accountTypes": [{"name": acc_type, "value": count} for acc_type, count in account_types],
+        "loanTypes": [
+            {"name": "Personal", "value": personal_loans},
+            {"name": "Auto", "value": auto_loans},
+            {"name": "Home", "value": home_loans}
+        ],
+        "cardTypes": [{"name": card_type, "value": count} for card_type, count in card_types],
+        "approvalRates": {
+            "accounts": {
+                "approved": round((approved_accounts / total_accounts_req * 100) if total_accounts_req > 0 else 0, 1),
+                "rejected": round(((total_accounts_req - approved_accounts) / total_accounts_req * 100) if total_accounts_req > 0 else 0, 1)
+            },
+            "loans": {
+                "approved": round((approved_loans / total_loans_req * 100) if total_loans_req > 0 else 0, 1),
+                "rejected": round(((total_loans_req - approved_loans) / total_loans_req * 100) if total_loans_req > 0 else 0, 1)
+            },
+            "cards": {
+                "approved": round((approved_cards / total_cards_req * 100) if total_cards_req > 0 else 0, 1),
+                "rejected": round(((total_cards_req - approved_cards) / total_cards_req * 100) if total_cards_req > 0 else 0, 1)
+            }
+        },
+        "userGrowth": user_growth,
+        "dailyAccounts": daily_accounts,
+        "monthlyData": monthly_data
+    }
+
+
+@router.get("/statistics/transactions")
+async def get_transaction_statistics(
+    admin_user: models.User = Depends(auth.get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Get daily transaction statistics for the last 30 days"""
+    from datetime import datetime, timedelta
+    
+    today = datetime.now()
+    daily_transactions = []
+    
+    for i in range(29, -1, -1):
+        day = today - timedelta(days=i)
+        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        # Count transactions
+        count = db.query(models.Transaction).filter(
+            models.Transaction.timestamp >= day_start,
+            models.Transaction.timestamp <= day_end
+        ).count()
+        
+        # Sum amounts
+        total_amount = db.query(func.sum(models.Transaction.amount)).filter(
+            models.Transaction.timestamp >= day_start,
+            models.Transaction.timestamp <= day_end
+        ).scalar() or 0
+        
+        daily_transactions.append({
+            "date": day.strftime("%b %d"),
+            "count": count,
+            "amount": float(total_amount)
+        })
+    
+    # Weekly summary
+    week_ago = today - timedelta(days=7)
+    weekly_volume = db.query(models.Transaction).filter(
+        models.Transaction.timestamp >= week_ago
+    ).count()
+    
+    weekly_amount = db.query(func.sum(models.Transaction.amount)).filter(
+        models.Transaction.timestamp >= week_ago
+    ).scalar() or 0
+    
+    return {
+        "dailyTransactions": daily_transactions,
+        "weeklyVolume": weekly_volume,
+        "weeklyAmount": float(weekly_amount)
+    }

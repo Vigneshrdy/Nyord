@@ -26,6 +26,7 @@ import Help from './pages/Help';
 import Transfer from './pages/Transfer';
 import Statistics from './pages/Statistics';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminStatistics from './pages/AdminStatistics';
 import Notifications from './pages/Notifications';
 import QRPayment from './pages/QRPayment';
 import PaymentPage from './pages/PaymentPage';
@@ -148,6 +149,11 @@ function App() {
             <Route path="/admin" element={
               <AdminRoute>
                 <AdminDashboard />
+              </AdminRoute>
+            } />
+            <Route path="/admin/statistics" element={
+              <AdminRoute>
+                <AdminStatistics />
               </AdminRoute>
             } />
             <Route path="/admin/kyc" element={

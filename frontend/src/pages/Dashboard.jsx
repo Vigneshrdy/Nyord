@@ -200,7 +200,7 @@ const Dashboard = () => {
                 </p>
                 <div className="mt-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400">Main Balance</p>
-                  <p className="text-xs text-gray-400">Dec 2024</p>
+                  <p className="text-xs text-gray-400">Dec 2025</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
                     ${cardBalance.toLocaleString()}
                   </p>
