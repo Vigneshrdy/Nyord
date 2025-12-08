@@ -210,6 +210,7 @@ const SidebarNavigation = () => {
           { href: "/cards", label: "Cards", icon: <CreditCard size={24} /> },
           { href: "/statements", label: "Statements", icon: <FileText size={24} /> },
           { href: "/loans", label: "Loans", icon: <Building size={24} /> },
+          { href: "/Statistics", label: "Statistics", icon: <BarChart3 size={24} /> },
           { href: "/fixed-deposits", label: "FDs", icon: <TrendingUp size={24} /> }
         ]),
     // Common links
