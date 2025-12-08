@@ -101,6 +101,7 @@ class FixedDeposit(Base):
     id = Column(Integer, primary_key=True, index=True)
     fd_number = Column(String, unique=True, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)  # Link to specific account
     principal = Column(Float, nullable=False)
     rate = Column(Float, nullable=False)
     start_date = Column(Date, nullable=False)
@@ -116,6 +117,7 @@ class FixedDeposit(Base):
     rejection_reason = Column(Text, nullable=True)
 
     owner = relationship("User", back_populates="fixed_deposits", foreign_keys=[user_id])
+    account = relationship("Account", foreign_keys=[account_id])
 
 
 class Loan(Base):

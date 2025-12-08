@@ -224,3 +224,146 @@ def publish_ws_event(event: dict):
     )
 
     connection.close()
+
+@celery_app.task(name="auto_debit_loan_emi")
+def auto_debit_loan_emi():
+    """Scheduled task to auto-debit EMI from linked accounts on due dates"""
+    from .models import Loan
+    from datetime import date
+    
+    db = SessionLocal()
+    try:
+        # Get all active loans where next_due_date is today or past
+        today = date.today()
+        due_loans = db.query(Loan).filter(
+            Loan.status == "ACTIVE",
+            Loan.next_due_date <= today
+        ).all()
+        
+        for loan in due_loans:
+            try:
+                # Get the linked account
+                account = db.query(Account).filter(
+                    Account.id == loan.account_ref
+                ).with_for_update().first()
+                
+                if not account:
+                    print(f"Account {loan.account_ref} not found for loan {loan.id}")
+                    # Create notification for user about failed auto-debit
+                    notification = Notification(
+                        user_id=loan.user_id,
+                        title="Loan EMI Auto-Debit Failed",
+                        message=f"Unable to debit EMI of ${loan.emi:,.2f} for your {loan.loan_type} loan. Linked account not found.",
+                        type="loan_payment",
+                        related_id=loan.id
+                    )
+                    db.add(notification)
+                    continue
+                
+                # Check if account has sufficient balance
+                if account.balance < loan.emi:
+                    print(f"Insufficient balance in account {account.id} for loan {loan.id}. Required: {loan.emi}, Available: {account.balance}")
+                    # Create notification for user
+                    notification = Notification(
+                        user_id=loan.user_id,
+                        title="Loan EMI Auto-Debit Failed",
+                        message=f"Insufficient balance to debit EMI of ${loan.emi:,.2f} for your {loan.loan_type} loan. Available balance: ${account.balance:,.2f}. Please maintain sufficient balance.",
+                        type="loan_payment",
+                        related_id=loan.id
+                    )
+                    db.add(notification)
+                    db.commit()
+                    
+                    # Send WebSocket notification
+                    try:
+                        asyncio.run(manager.send_personal_message(
+                            message={
+                                "type": "notification",
+                                "data": {
+                                    "id": notification.id,
+                                    "title": notification.title,
+                                    "message": notification.message,
+                                    "type": "loan_payment",
+                                    "is_read": False
+                                }
+                            },
+                            user_id=loan.user_id
+                        ))
+                    except Exception as e:
+                        print(f"Failed to send WebSocket notification: {e}")
+                    continue
+                
+                # Debit EMI from account
+                account.balance -= loan.emi
+                loan.amount_paid = round(loan.amount_paid + loan.emi, 2)
+                loan.outstanding = round(max(loan.total_payable - loan.amount_paid, 0.0), 2)
+                
+                # Update next due date or close loan
+                from datetime import timedelta
+                if loan.outstanding > 0:
+                    loan.next_due_date = loan.next_due_date + timedelta(days=30)
+                else:
+                    loan.status = "CLOSED"
+                    loan.next_due_date = None
+                
+                # Log the auto-debit
+                audit_log = AuditLog(
+                    event_type="LOAN_EMI_AUTO_DEBIT",
+                    message=f"Auto-debited EMI of ${loan.emi} from account {account.account_number} for loan {loan.id}"
+                )
+                db.add(audit_log)
+                
+                # Create success notification
+                notification = Notification(
+                    user_id=loan.user_id,
+                    title="Loan EMI Auto-Debited",
+                    message=f"EMI of ${loan.emi:,.2f} has been debited for your {loan.loan_type} loan. Outstanding: ${loan.outstanding:,.2f}. New balance: ${account.balance:,.2f}.",
+                    type="loan_payment",
+                    related_id=loan.id
+                )
+                db.add(notification)
+                db.commit()
+                
+                print(f"Successfully auto-debited EMI for loan {loan.id}. Outstanding: {loan.outstanding}")
+                
+                # Send WebSocket notification
+                try:
+                    asyncio.run(manager.send_personal_message(
+                        message={
+                            "type": "notification",
+                            "data": {
+                                "id": notification.id,
+                                "title": notification.title,
+                                "message": notification.message,
+                                "type": "loan_payment",
+                                "is_read": False
+                            }
+                        },
+                        user_id=loan.user_id
+                    ))
+                except Exception as e:
+                    print(f"Failed to send WebSocket notification: {e}")
+                
+                # Publish WebSocket event
+                publish_ws_event({
+                    "type": "loan.emi_debit",
+                    "loan_id": loan.id,
+                    "user_id": loan.user_id,
+                    "emi_amount": loan.emi,
+                    "outstanding": loan.outstanding,
+                    "status": loan.status,
+                    "account_balance": account.balance
+                })
+                
+            except Exception as e:
+                print(f"Error processing loan {loan.id}: {e}")
+                db.rollback()
+                continue
+        
+        print(f"Processed {len(due_loans)} due loans for EMI auto-debit")
+        
+    except Exception as e:
+        print(f"Error in auto_debit_loan_emi task: {e}")
+        db.rollback()
+    finally:
+        db.close()

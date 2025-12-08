@@ -1,19 +1,35 @@
 import { useEffect, useState } from 'react';
-import { fixedDepositsAPI } from '../services/api';
+import { fixedDepositsAPI, accountsAPI } from '../services/api';
 
 const FixedDeposits = () => {
   const [fds, setFds] = useState([]);
+  const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ principal: 10000, rate: 7.0, tenure_months: 12, start_date: new Date().toISOString().slice(0,10) });
+  const [form, setForm] = useState({ principal: 10000, rate: 7.0, tenure_months: 12, start_date: new Date().toISOString().slice(0,10), account_id: '' });
   const allowedRates = [7.0, 8.0, 9.0, 10.0];
   const [renewingId, setRenewingId] = useState(null);
   const [renewForm, setRenewForm] = useState({ principal: '', tenure_months: '' });
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     loadFDs();
+    loadAccounts();
   }, []);
+
+  const loadAccounts = async () => {
+    try {
+      const accountsList = await accountsAPI.getAccounts();
+      setAccounts(accountsList || []);
+      // Set default account if available
+      if (accountsList && accountsList.length > 0) {
+        setForm(prev => ({ ...prev, account_id: accountsList[0].id }));
+      }
+    } catch (err) {
+      console.error('Failed to load accounts:', err);
+    }
+  };
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
@@ -38,6 +54,51 @@ const FixedDeposits = () => {
     return +(principal * Math.pow(1 + rate / 100, years)).toFixed(2);
   };
 
+  const beginRenew = (fd) => {
+    setRenewingId(fd.id);
+    setRenewForm({ 
+      principal: fd.principal, 
+      tenure_months: fd.tenure_months,
+      account_id: fd.account_id || (accounts.length > 0 ? accounts[0].id : '')
+    });
+  };
+
+  const submitRenew = async (e) => {
+    e.preventDefault();
+    if (!renewingId) return;
+    try {
+      const principal = Number(renewForm.principal);
+      const tenureMonths = Number(renewForm.tenure_months);
+      const accountId = Number(renewForm.account_id);
+      const newFd = await fixedDepositsAPI.renewFD(renewingId, principal, tenureMonths, accountId);
+      showMessage('success', 'Fixed deposit renewed');
+      // Update old FD status locally
+      setFds((prev) => {
+        const updated = prev.map(fd => fd.id === renewingId ? { ...fd, status: 'RENEWED' } : fd);
+        return [newFd, ...updated];
+      });
+      setRenewingId(null);
+    } catch (err) {
+      showMessage('error', err.message || 'Renewal failed');
+    }
+  };
+
+  const handleCancelFD = async (fdId) => {
+    if (!window.confirm('Are you sure you want to cancel this FD? Penalties may apply for premature withdrawal.')) {
+      return;
+    }
+    setCancellingId(fdId);
+    try {
+      const cancelledFd = await fixedDepositsAPI.cancelFD(fdId);
+      showMessage('success', 'Fixed deposit cancelled successfully. Amount credited to your account.');
+      setFds((prev) => prev.map(fd => fd.id === fdId ? cancelledFd : fd));
+    } catch (err) {
+      showMessage('error', err.message || 'Failed to cancel FD');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     setCreating(true);
@@ -47,34 +108,12 @@ const FixedDeposits = () => {
         rate: Number(form.rate),
         tenure_months: Number(form.tenure_months),
         start_date: form.start_date,
+        account_id: Number(form.account_id),
       };
       const created = await fixedDepositsAPI.createFD(payload);
       showMessage('success', 'Fixed deposit created');
       setFds((s) => [created, ...s]);
     } catch (err) {
-        const beginRenew = (fd) => {
-          setRenewingId(fd.id);
-          setRenewForm({ principal: fd.principal, tenure_months: fd.tenure_months });
-        };
-
-        const submitRenew = async (e) => {
-          e.preventDefault();
-          if (!renewingId) return;
-          try {
-            const principal = Number(renewForm.principal);
-            const tenureMonths = Number(renewForm.tenure_months);
-            const newFd = await fixedDepositsAPI.renewFD(renewingId, principal, tenureMonths);
-            showMessage('success', 'Fixed deposit renewed');
-            // Update old FD status locally
-            setFds((prev) => {
-              const updated = prev.map(fd => fd.id === renewingId ? { ...fd, status: 'RENEWED' } : fd);
-              return [newFd, ...updated];
-            });
-            setRenewingId(null);
-          } catch (err) {
-            showMessage('error', err.message || 'Renewal failed');
-          }
-        };
       console.error(err);
       showMessage('error', err.message || 'Failed to create FD');
     } finally {
@@ -136,6 +175,11 @@ const FixedDeposits = () => {
                         <div>
                           <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">FD Number</div>
                           <div className="font-bold text-gray-900 dark:text-white text-lg">{fd.fd_number}</div>
+                          {fd.account_id && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Account: {accounts.find(a => a.id === fd.account_id)?.account_number || fd.account_id}
+                            </div>
+                          )}
                         </div>
                         <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">{fd.status}</span>
                       </div>
@@ -150,7 +194,7 @@ const FixedDeposits = () => {
                           <div className="font-semibold text-green-600 dark:text-green-400">{fd.rate}% p.a.</div>
                         </div>
                         <div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Maturity Date</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Start Date</div>
                           <div className="font-semibold text-gray-900 dark:text-white">{fd.start_date}</div>
                         </div>
                         <div>
@@ -170,26 +214,55 @@ const FixedDeposits = () => {
                       </div>
 
                       <div className="flex gap-3">
-                        <button className="flex-1 py-2 px-4 bg-white dark:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-500 transition-all border border-gray-300 dark:border-gray-500">View Details</button>
                         {fd.status === 'ACTIVE' && (
-                          <button onClick={()=>beginRenew(fd)} className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all">Renew FD</button>
+                          <>
+                            <button onClick={()=>beginRenew(fd)} className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all">Renew</button>
+                            <button 
+                              onClick={()=>handleCancelFD(fd.id)} 
+                              disabled={cancellingId === fd.id}
+                              className="flex-1 py-2 px-4 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {cancellingId === fd.id ? 'Cancelling...' : 'Cancel FD'}
+                            </button>
+                          </>
+                        )}
+                        {fd.status !== 'ACTIVE' && (
+                          <button disabled className="flex-1 py-2 px-4 bg-gray-300 dark:bg-gray-600 text-gray-600 dark:text-gray-400 rounded-lg font-medium cursor-not-allowed">
+                            {fd.status}
+                          </button>
                         )}
                       </div>
                       {renewingId === fd.id && (
                         <form onSubmit={submitRenew} className="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-3">
+                          <div>
+                            <label className="text-xs text-gray-600 dark:text-gray-300 mb-1 block">Select Account</label>
+                            <select 
+                              value={renewForm.account_id} 
+                              onChange={(e)=>setRenewForm({...renewForm, account_id:e.target.value})} 
+                              className="w-full px-2 py-1 rounded border text-sm dark:bg-gray-600 dark:text-white"
+                              required
+                            >
+                              <option value="">Choose account...</option>
+                              {accounts.map(acc => (
+                                <option key={acc.id} value={acc.id}>
+                                  {acc.account_number} - ${Number(acc.balance).toLocaleString()}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-xs text-gray-600 dark:text-gray-300">New Principal</label>
-                              <input type="number" value={renewForm.principal} onChange={(e)=>setRenewForm({...renewForm, principal:e.target.value})} className="w-full px-2 py-1 rounded border text-sm" />
+                              <input type="number" value={renewForm.principal} onChange={(e)=>setRenewForm({...renewForm, principal:e.target.value})} className="w-full px-2 py-1 rounded border text-sm dark:bg-gray-600 dark:text-white" required />
                             </div>
                             <div>
                               <label className="text-xs text-gray-600 dark:text-gray-300">New Tenure (months)</label>
-                              <input type="number" value={renewForm.tenure_months} onChange={(e)=>setRenewForm({...renewForm, tenure_months:e.target.value})} className="w-full px-2 py-1 rounded border text-sm" />
+                              <input type="number" value={renewForm.tenure_months} onChange={(e)=>setRenewForm({...renewForm, tenure_months:e.target.value})} className="w-full px-2 py-1 rounded border text-sm dark:bg-gray-600 dark:text-white" required />
                             </div>
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">Rate remains {fd.rate}%</div>
                           <div className="flex justify-end gap-2">
-                            <button type="button" onClick={()=>setRenewingId(null)} className="px-3 py-1 text-sm rounded border">Cancel</button>
+                            <button type="button" onClick={()=>setRenewingId(null)} className="px-3 py-1 text-sm rounded border dark:border-gray-500">Cancel</button>
                             <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-600 text-white">Confirm Renewal</button>
                           </div>
                         </form>
@@ -206,12 +279,28 @@ const FixedDeposits = () => {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Open New Fixed Deposit</h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
+                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Select Account</label>
+                  <select 
+                    value={form.account_id} 
+                    onChange={(e)=>setForm({...form, account_id: e.target.value})} 
+                    className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white"
+                    required
+                  >
+                    <option value="">Choose account...</option>
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.account_number} - {acc.account_type} (Balance: ${Number(acc.balance).toLocaleString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Principal</label>
-                  <input type="number" value={form.principal} onChange={(e)=>setForm({...form, principal: e.target.value})} className="w-full px-3 py-2 rounded-lg border" />
+                  <input type="number" value={form.principal} onChange={(e)=>setForm({...form, principal: e.target.value})} className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white" required />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Rate (%)</label>
-                  <select value={form.rate} onChange={(e)=>setForm({...form, rate: parseFloat(e.target.value)})} className="w-full px-3 py-2 rounded-lg border">
+                  <select value={form.rate} onChange={(e)=>setForm({...form, rate: parseFloat(e.target.value)})} className="w-full px-3 py-2 rounded-lg border dark:bg-gray-700 dark:text-white">
                     {allowedRates.map(r => <option key={r} value={r}>{r}%</option>)}
                   </select>
                 </div>

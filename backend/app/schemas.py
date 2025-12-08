@@ -163,12 +163,20 @@ class FixedDepositCreate(BaseModel):
     rate: float
     start_date: date
     tenure_months: int
+    account_id: int
+
+
+class FixedDepositRenew(BaseModel):
+    principal: float
+    tenure_months: int
+    account_id: int
 
 
 class FixedDepositOut(BaseModel):
     id: int
     fd_number: str
     user_id: int
+    account_id: Optional[int] = None
     principal: float
     rate: float
     start_date: date

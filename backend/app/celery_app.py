@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 
 celery_app = Celery(
     "banking_celery",
@@ -11,5 +12,16 @@ celery_app = Celery(
 # Previously this was set to a custom queue 'transaction.process',
 # causing the worker (listening only on 'celery') to never receive tasks.
 celery_app.conf.task_routes = {
-    "process_transaction": {"queue": "celery"} ###
+    "process_transaction": {"queue": "celery"},
+    "auto_debit_loan_emi": {"queue": "celery"}
 }
+
+# Schedule periodic tasks
+celery_app.conf.beat_schedule = {
+    'auto-debit-loan-emi-daily': {
+        'task': 'auto_debit_loan_emi',
+        'schedule': crontab(hour=0, minute=0),  # Run daily at midnight
+    },
+}
+
+celery_app.conf.timezone = 'UTC'

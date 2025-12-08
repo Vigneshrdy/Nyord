@@ -220,10 +220,16 @@ export const fixedDepositsAPI = {
       body: JSON.stringify(fdData),
     });
   },
-  renewFD: async (fdId, principal, tenureMonths) => {
+  renewFD: async (fdId, principal, tenureMonths, accountId) => {
     return await apiRequest(`/fixed-deposits/${fdId}/renew`, {
       method: 'POST',
-      body: JSON.stringify({ principal, tenure_months: tenureMonths }),
+      body: JSON.stringify({ principal, tenure_months: tenureMonths, account_id: accountId }),
+    });
+  },
+  
+  cancelFD: async (fdId) => {
+    return await apiRequest(`/fixed-deposits/${fdId}/cancel`, {
+      method: 'POST',
     });
   },
 };
