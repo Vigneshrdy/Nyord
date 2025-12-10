@@ -7,8 +7,8 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
     "lint": "eslint .",
-"start": "npm run dev",
-    "preview": "vite preview --host 0.0.0.0 --port 3000"
+    "start": "npm run dev",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.0.4",
@@ -17,16 +17,20 @@
     "@radix-ui/react-popover": "^1.0.7",
     "@radix-ui/react-separator": "^1.0.3",
     "@radix-ui/react-slot": "^1.0.2",
+    "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",
-    "framer-motion": "^12.23.24",
+    "framer-motion": "^12.23.25",
     "jspdf": "^3.0.4",
+    "lightweight-charts": "^5.0.9",
     "lucide-react": "^0.454.0",
+    "qr-scanner": "^1.4.2",
     "react": "^19.0.0",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.3",
-    "tailwind-merge": "^2.2.0",
-    "qr-scanner": "^1.4.2"
+    "recharts": "^2.15.4",
+    "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

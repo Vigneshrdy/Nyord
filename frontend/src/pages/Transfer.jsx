@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { accountsAPI, transactionsAPI, cardsAPI } from '../services/api';
 
 const Transfer = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [accounts, setAccounts] = useState([]);
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -13,14 +14,18 @@ const Transfer = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   
   const [transferData, setTransferData] = useState({
+    transferType: 'external', // 'external' (to other users) or 'internal' (between own accounts)
     sourceType: 'account', // 'account' or 'card'
     sourceAccount: '',
     sourceCard: '',
+    destAccount: '', // For internal transfers
     recipientUser: null,
     recipientAccount: null,
     amount: '',
     cardPin: '', // Required for card transfers
   });
+
+  const [recipientAccounts, setRecipientAccounts] = useState([]);
 
   const [message, setMessage] = useState({ type: '', text: '' });
 
@@ -29,11 +34,43 @@ const Transfer = () => {
     fetchCards();
   }, []);
 
+  // If navigated with recipient in location.state or query param, prefill recipient
+  useEffect(() => {
+    const preselected = location?.state?.recipientUser;
+    const params = new URLSearchParams(location.search);
+    const recipientQuery = params.get('recipient');
+
+    if (preselected) {
+      // If recipient user object provided via state, select it
+      selectRecipient(preselected);
+    } else if (recipientQuery) {
+      // Search users by username query and select first match
+      (async () => {
+        try {
+          setSearchLoading(true);
+          const results = await transactionsAPI.searchUsers(recipientQuery);
+          if (results && results.length > 0) {
+            await selectRecipient(results[0]);
+          }
+        } catch (e) {
+          console.error('Auto-select recipient failed', e);
+        } finally {
+          setSearchLoading(false);
+        }
+      })();
+    }
+  }, [location.search, location.state]);
+
   const fetchAccounts = async () => {
     try {
       const data = await accountsAPI.getAccounts();
       console.log('Fetched accounts:', data);
       setAccounts(data || []);
+      // Auto-select first approved account as default source to improve UX
+      const approved = (data || []).filter(acc => acc.status === 'approved');
+      if (approved.length > 0) {
+        setTransferData(prev => ({ ...prev, sourceAccount: String(approved[0].id) }));
+      }
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
     }
@@ -85,10 +122,11 @@ const Transfer = () => {
     try {
       const userAccounts = await accountsAPI.getUserAccounts(user.id);
       if (userAccounts && userAccounts.length > 0) {
+        setRecipientAccounts(userAccounts);
         setTransferData(prev => ({
           ...prev,
           recipientUser: user,
-          recipientAccount: userAccounts[0].id
+          recipientAccount: String(userAccounts[0].id)
         }));
       } else {
         showMessage('error', 'Recipient has no accounts');
@@ -220,6 +258,47 @@ const Transfer = () => {
         {/* Transfer Form */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 shadow-lg">
           <form onSubmit={handleTransfer} className="space-y-6">
+            {/* Transfer Type Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Transfer Type
+              </label>
+              <div className="flex space-x-4 mb-4">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="external"
+                    checked={transferData.transferType === 'external'}
+                    onChange={(e) => setTransferData({ 
+                      ...transferData, 
+                      transferType: e.target.value, 
+                      recipientUser: null, 
+                      recipientAccount: null, 
+                      destAccount: '' 
+                    })}
+                    className="mr-2"
+                  />
+                  To Other Users
+                </label>
+                {/* <label className="flex items-center">
+                  <input
+                    type="radio"
+                    value="internal"
+                    checked={transferData.transferType === 'internal'}
+                    onChange={(e) => setTransferData({ 
+                      ...transferData, 
+                      transferType: e.target.value, 
+                      recipientUser: null, 
+                      recipientAccount: null, 
+                      destAccount: '' 
+                    })}
+                    className="mr-2"
+                  />
+                  Between My Accounts
+                </label> */}
+              </div>
+            </div>
+
             {/* Source Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -236,7 +315,7 @@ const Transfer = () => {
                   />
                   Bank Account
                 </label>
-                <label className="flex items-center">
+                {/* <label className="flex items-center">
                   <input
                     type="radio"
                     value="card"
@@ -245,7 +324,7 @@ const Transfer = () => {
                     className="mr-2"
                   />
                   Credit Card
-                </label>
+                </label> */}
               </div>
             </div>
 
@@ -262,7 +341,7 @@ const Transfer = () => {
                 required
               >
                 <option value="">Select an account</option>
-                {accounts.map(acc => (
+                {accounts.filter(acc => acc.status === 'approved').map(acc => (
                   <option key={acc.id} value={String(acc.id)}>
                     {acc.account_type === 'savings' ? 'Savings' : 'Current'} - {acc.account_number} - Balance: ${acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </option>
@@ -311,11 +390,35 @@ const Transfer = () => {
               </div>
             )}
 
-            {/* Recipient Search */}
-            <div className="relative">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Recipient Username
-              </label>
+            {/* Destination Selection - Internal vs External */}
+            {transferData.transferType === 'internal' ? (
+              /* Internal Transfer - Destination Account */
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  To Account
+                </label>
+                <select
+                  value={transferData.destAccount}
+                  onChange={(e) => setTransferData({ ...transferData, destAccount: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                >
+                  <option value="">Select destination account</option>
+                  {accounts.filter(acc => acc.id.toString() !== transferData.sourceAccount).map(acc => (
+                    <option key={acc.id} value={String(acc.id)}>
+                      {acc.account_type === 'savings' ? 'Savings' : 'Current'} - {acc.account_number} - Balance: ${acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              /* External Transfer - Recipient Search */
+              <>
+                {/* Recipient Search */}
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Recipient Username
+                  </label>
               <input
                 type="text"
                 value={searchQuery}
@@ -358,23 +461,46 @@ const Transfer = () => {
               )}
             </div>
 
-            {/* Selected Recipient Info */}
-            {transferData.recipientUser && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-200 dark:border-blue-700">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
-                    {transferData.recipientUser.username.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">
-                      {transferData.recipientUser.username}
+                {/* Selected Recipient Info */}
+                {transferData.recipientUser && (
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl border border-blue-200 dark:border-blue-700">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg mr-4">
+                        {transferData.recipientUser.username.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          {transferData.recipientUser.username}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {transferData.recipientUser.full_name || 'No name'} • {transferData.recipientUser.email}
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {transferData.recipientUser.full_name || 'No name'} • {transferData.recipientUser.email}
-                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+                {/* Recipient's Accounts Dropdown (allow user to pick which of recipient's accounts to send to) */}
+                {transferData.recipientUser && recipientAccounts.length > 0 && (
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Recipient Account
+                    </label>
+                    <select
+                      value={String(transferData.recipientAccount || '')}
+                      onChange={(e) => setTransferData({ ...transferData, recipientAccount: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select recipient account</option>
+                      {recipientAccounts.map(acc => (
+                        <option key={acc.id} value={String(acc.id)}>
+                          {acc.account_type === 'savings' ? 'Savings' : 'Current'} - {acc.account_number} - Balance: ${acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Amount */}

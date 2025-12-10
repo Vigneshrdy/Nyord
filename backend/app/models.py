@@ -38,8 +38,10 @@ class User(Base):
     emergency_contact_name = Column(String, nullable=True)
     emergency_contact_phone = Column(String, nullable=True)
     emergency_contact_relation = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    accounts = relationship("Account", back_populates="owner")
+    accounts = relationship("Account", back_populates="owner", foreign_keys="[Account.user_id]")
     fixed_deposits = relationship("FixedDeposit", back_populates="owner", foreign_keys="[FixedDeposit.user_id]")
     loans = relationship("Loan", back_populates="owner", foreign_keys="[Loan.user_id]")
     cards = relationship("Card", back_populates="owner", foreign_keys="[Card.user_id]")
@@ -53,8 +55,15 @@ class Account(Base):
     account_type = Column(String, default="savings")  # 'savings' or 'current'
     balance = Column(Float, default=0.0)
     user_id = Column(Integer, ForeignKey("users.id"))
+    
+    # Account approval fields
+    status = Column(String, default="pending", nullable=False)  # 'pending', 'approved', 'rejected'
+    approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    approval_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    owner = relationship("User", back_populates="accounts")
+    owner = relationship("User", back_populates="accounts", foreign_keys=[user_id])
+    approver = relationship("User", foreign_keys=[approved_by])
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -94,6 +103,7 @@ class FixedDeposit(Base):
     id = Column(Integer, primary_key=True, index=True)
     fd_number = Column(String, unique=True, index=True, nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=True)  # Link to specific account
     principal = Column(Float, nullable=False)
     rate = Column(Float, nullable=False)
     start_date = Column(Date, nullable=False)
@@ -109,6 +119,7 @@ class FixedDeposit(Base):
     rejection_reason = Column(Text, nullable=True)
 
     owner = relationship("User", back_populates="fixed_deposits", foreign_keys=[user_id])
+    account = relationship("Account", foreign_keys=[account_id])
 
 
 class Loan(Base):
@@ -134,6 +145,7 @@ class Loan(Base):
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approval_date = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="loans", foreign_keys=[user_id])
 
@@ -160,6 +172,7 @@ class Card(Base):
     approved_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     approval_date = Column(DateTime, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="cards", foreign_keys=[user_id])
 

@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Check, CheckCheck, Trash2, Filter, Search, Clock, User, CreditCard, DollarSign, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import { getToken } from '../services/api';
 
-const BASE_URL = window.location.protocol === 'https:' ? 'https://taksari.me' : 'http://taksari.me';
+const BASE_URL = 'http://localhost:8000';
 
 const Notifications = () => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const token = getToken();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
@@ -252,20 +254,20 @@ const Notifications = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => navigate('/dashboard')}
-            className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
             Back to Dashboard
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
                 <Bell className="w-8 h-8 mr-3 text-blue-600" />
                 Notifications
               </h1>

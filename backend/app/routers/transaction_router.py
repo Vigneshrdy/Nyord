@@ -81,8 +81,36 @@ def get_my_transactions(db: Session = Depends(get_db),
         (Transaction.src_account.in_(user_account_ids)) | 
         (Transaction.dest_account.in_(user_account_ids))
     ).order_by(Transaction.timestamp.desc()).all()
-    
-    return transactions
+
+    # Build response list including source/destination usernames for frontend display
+    result = []
+    for txn in transactions:
+        src_user_name = None
+        dest_user_name = None
+        try:
+            if txn.src_acc_rel and txn.src_acc_rel.owner:
+                src_user_name = txn.src_acc_rel.owner.username
+        except Exception:
+            src_user_name = None
+
+        try:
+            if txn.dest_acc_rel and txn.dest_acc_rel.owner:
+                dest_user_name = txn.dest_acc_rel.owner.username
+        except Exception:
+            dest_user_name = None
+
+        result.append({
+            "id": txn.id,
+            "src_account": txn.src_account,
+            "dest_account": txn.dest_account,
+            "amount": txn.amount,
+            "status": txn.status,
+            "timestamp": txn.timestamp,
+            "src_user_name": src_user_name,
+            "dest_user_name": dest_user_name
+        })
+
+    return result
 
 
 @router.post("/qr-transfer", response_model=TransactionOut)

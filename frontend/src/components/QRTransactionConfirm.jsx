@@ -155,35 +155,7 @@ const QRTransactionConfirm = ({
           )}
         </div>
 
-        {/* Description Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <span className="material-symbols-outlined mr-1 text-sm align-middle">description</span>
-            Description (Optional)
-          </label>
-          <input
-            type="text"
-            value={description}
-            onChange={handleDescriptionChange}
-            placeholder="What's this payment for? (Optional)"
-            maxLength={100}
-            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.description ? 'border-red-300 bg-red-50' : 'border-gray-300'
-            }`}
-            disabled={loading}
-          />
-          <div className="flex justify-between mt-1">
-            {errors.description ? (
-              <p className="text-sm text-red-600 flex items-center">
-                <span className="material-symbols-outlined mr-1 text-sm">error</span>
-                {errors.description}
-              </p>
-            ) : (
-              <p className="text-sm text-gray-500">Brief description of the payment</p>
-            )}
-            <span className="text-xs text-gray-400">{description.length}/100</span>
-          </div>
-        </div>
+
 
         {/* Warning for same user */}
         {recipient.user_id === user?.id && (

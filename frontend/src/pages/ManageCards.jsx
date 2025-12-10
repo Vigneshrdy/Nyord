@@ -12,13 +12,7 @@ const ManageCards = () => {
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinModalAction, setPinModalAction] = useState(null); // { action: 'block'/'unblock', cardId: number }
   const [pinInput, setPinInput] = useState('');
-  const [cardSettings, setCardSettings] = useState({
-    onlineTransactions: true,
-    contactlessPayments: true,
-    internationalUsage: false,
-    atmWithdrawals: true,
-    notifications: true,
-  });
+
   const [visibleCardNumbers, setVisibleCardNumbers] = useState(new Set());
   const [showChangePinModal, setShowChangePinModal] = useState(false);
   const [changePinCardId, setChangePinCardId] = useState(null);
@@ -27,6 +21,9 @@ const ManageCards = () => {
   const [confirmNewPinInput, setConfirmNewPinInput] = useState('');
   const [changePinLoading, setChangePinLoading] = useState(false);
   const [changePinStep, setChangePinStep] = useState(1); // 1: current, 2: new+confirm
+  const [showViewDetailsModal, setShowViewDetailsModal] = useState(false);
+  const [viewDetailsCardId, setViewDetailsCardId] = useState(null);
+  const [viewDetailsPinInput, setViewDetailsPinInput] = useState('');
 
   useEffect(() => {
     fetchCards();
@@ -105,23 +102,39 @@ const ManageCards = () => {
     return number;
   };
 
-  const toggleCardNumberVisibility = (cardId) => {
-    setVisibleCardNumbers(prev => {
-      const next = new Set(prev);
-      if (next.has(cardId)) {
-        next.delete(cardId);
-      } else {
-        next.add(cardId);
-      }
-      return next;
-    });
+  const openViewDetailsModal = (cardId) => {
+    setViewDetailsCardId(cardId);
+    setViewDetailsPinInput('');
+    setShowViewDetailsModal(true);
   };
 
-  const toggleSetting = (settingKey) => {
-    setCardSettings(prev => ({
-      ...prev,
-      [settingKey]: !prev[settingKey]
-    }));
+  const handleViewDetailsSubmit = async () => {
+    if (!viewDetailsPinInput || viewDetailsPinInput.length !== 4 || !/^\d{4}$/.test(viewDetailsPinInput)) {
+      alert('Please enter a valid 4-digit PIN');
+      return;
+    }
+
+    try {
+      await cardsAPI.verifyPin(viewDetailsCardId, viewDetailsPinInput);
+      setVisibleCardNumbers(prev => {
+        const next = new Set(prev);
+        next.add(viewDetailsCardId);
+        return next;
+      });
+      setShowViewDetailsModal(false);
+      setViewDetailsPinInput('');
+    } catch (e) {
+      console.error('Invalid PIN', e);
+      alert(e.message || 'Invalid PIN');
+    }
+  };
+
+  const hideCardDetails = (cardId) => {
+    setVisibleCardNumbers(prev => {
+      const next = new Set(prev);
+      next.delete(cardId);
+      return next;
+    });
   };
 
   const openChangePinModal = (cardId) => {
@@ -184,10 +197,10 @@ const ManageCards = () => {
           <p className="text-gray-600 dark:text-gray-400">Manage your cards and settings</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left: Card Display */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Card Carousel */}
+        <div className="space-y-8">
+          {/* Card Display */}
+          <div className="space-y-8">
+            {/* Cards Grid */}
             <div className="relative">
               {loading ? (
                 <div className="w-full h-56 bg-white dark:bg-gray-800 rounded-2xl shadow-lg flex items-center justify-center">
@@ -199,52 +212,79 @@ const ManageCards = () => {
                   <p className="text-gray-500 dark:text-gray-400 text-center mb-4">No cards yet. Request your first card to get started!</p>
                 </div>
               ) : (
-              <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
                 {cards.map((card, idx) => (
                   <div
                     key={idx}
-                    className={`flex-shrink-0 w-full sm:w-96 h-56 bg-gradient-to-br ${card.gradient_colors || 'from-gray-600 to-gray-800'} rounded-2xl shadow-2xl p-6 text-white cursor-pointer transform transition-all hover:scale-105 snap-center ${
-                      activeCard === idx ? 'ring-4 ring-blue-400 ring-offset-4 dark:ring-offset-gray-900' : ''
+                    className={`relative w-full aspect-[1.586/1] bg-gradient-to-br ${card.gradient_colors || 'from-indigo-600 via-purple-600 to-pink-600'} rounded-2xl shadow-xl p-6 text-white transition-all duration-300 hover:shadow-2xl cursor-pointer overflow-hidden ${
+                      activeCard === idx ? 'ring-2 ring-blue-400 ring-offset-2 dark:ring-offset-gray-900' : ''
                     }`}
                     onClick={() => setActiveCard(idx)}
                   >
-                    <div className="flex justify-between items-start mb-8">
-                      <div>
-                        <div className="text-xs opacity-80 mb-1">Card Type</div>
-                        <div className="text-lg font-bold">{card.card_type}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); toggleCardNumberVisibility(card.id); }}
-                          className="rounded-full bg-white/15 hover:bg-white/25 p-2"
-                          title={visibleCardNumbers.has(card.id) ? 'Hide card number' : 'Show card number'}
-                        >
-                          <span className="material-symbols-outlined text-xl">{visibleCardNumbers.has(card.id) ? 'visibility_off' : 'visibility'}</span>
-                        </button>
-                        <span className="material-symbols-outlined text-4xl">contactless</span>
-                      </div>
+                    {/* Background Pattern */}
+                    <div className="absolute inset-0 opacity-10">
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl -translate-y-32 translate-x-32"></div>
+                      <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full blur-3xl translate-y-24 -translate-x-24"></div>
                     </div>
-                    
-                    <div className="mb-6">
-                      <div className="text-2xl font-bold tracking-wider mb-2">
-                        {visibleCardNumbers.has(card.id) ? card.card_number : maskCardNumber(card.card_number)}
+                    {/* Card Content - Relative to stay above background */}
+                    <div className="relative h-full flex flex-col justify-between">
+                      {/* Top Section */}
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-xs opacity-70 mb-0.5 uppercase tracking-wider">Card Type</div>
+                          <div className="text-base font-bold">{card.card_type}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {visibleCardNumbers.has(card.id) ? (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); hideCardDetails(card.id); }}
+                              className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm p-1.5 transition-all"
+                              title="Hide card details"
+                            >
+                              <span className="material-symbols-outlined text-lg">visibility_off</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); openViewDetailsModal(card.id); }}
+                              className="rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm p-1.5 transition-all"
+                              title="View card details (requires PIN)"
+                            >
+                              <span className="material-symbols-outlined text-lg">visibility</span>
+                            </button>
+                          )}
+                          <span className="material-symbols-outlined text-3xl opacity-90">contactless</span>
+                        </div>
                       </div>
-                      <div className="text-sm opacity-80">Available: ${(card.available_credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-                    </div>
+                      
+                      {/* Middle Section - Card Number */}
+                      <div className="my-auto">
+                        <div className="text-xl font-mono font-bold tracking-widest mb-1">
+                          {visibleCardNumbers.has(card.id) ? card.card_number : maskCardNumber(card.card_number)}
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="material-symbols-outlined text-sm opacity-70">account_balance_wallet</span>
+                          <span className="text-xs opacity-80">Available: ${(card.available_credit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
 
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <div className="text-xs opacity-80 mb-1">Card Holder</div>
-                        <div className="font-semibold text-sm">{card.card_holder}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs opacity-80 mb-1">Expires</div>
-                        <div className="font-semibold text-sm">{card.expiry_date}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs opacity-80 mb-1">CVV</div>
-                        <div className="font-semibold text-sm">{visibleCardNumbers.has(card.id) ? (card.cvv || '***') : '***'}</div>
+                      {/* Bottom Section */}
+                      <div className="flex justify-between items-end text-sm">
+                        <div className="flex-1">
+                          <div className="text-[10px] opacity-70 mb-0.5 uppercase tracking-wider">Card Holder</div>
+                          <div className="font-semibold truncate pr-2">{card.card_holder}</div>
+                        </div>
+                        <div className="flex gap-4">
+                          <div>
+                            <div className="text-[10px] opacity-70 mb-0.5 uppercase tracking-wider">Expires</div>
+                            <div className="font-semibold">{card.expiry_date}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] opacity-70 mb-0.5 uppercase tracking-wider">CVV</div>
+                            <div className="font-semibold font-mono">{visibleCardNumbers.has(card.id) ? (card.cvv || '***') : '***'}</div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -376,96 +416,48 @@ const ManageCards = () => {
             </div>
             )}
           </div>
+        </div>
 
-          {/* Right: Settings & Transactions */}
-          <div className="space-y-6">
-            {/* Card Settings */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Card Settings</h2>
-              
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">Online Transactions</span>
-                  <button
-                    onClick={() => toggleSetting('onlineTransactions')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cardSettings.onlineTransactions ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cardSettings.onlineTransactions ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">Contactless Payments</span>
-                  <button
-                    onClick={() => toggleSetting('contactlessPayments')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cardSettings.contactlessPayments ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cardSettings.contactlessPayments ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">International Usage</span>
-                  <button
-                    onClick={() => toggleSetting('internationalUsage')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cardSettings.internationalUsage ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cardSettings.internationalUsage ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">ATM Withdrawals</span>
-                  <button
-                    onClick={() => toggleSetting('atmWithdrawals')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cardSettings.atmWithdrawals ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cardSettings.atmWithdrawals ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">Notifications</span>
-                  <button
-                    onClick={() => toggleSetting('notifications')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      cardSettings.notifications ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        cardSettings.notifications ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
+        {/* View Card Details PIN Modal */}
+        {showViewDetailsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full">
+              <div className="flex items-center mb-4">
+                <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 mr-3">lock</span>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Verify PIN
+                </h3>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Enter your 4-digit card PIN to view full card number and CVV.
+              </p>
+              <input
+                type="password"
+                maxLength={4}
+                value={viewDetailsPinInput}
+                onChange={(e) => setViewDetailsPinInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="Enter PIN"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
+                autoFocus
+                onKeyPress={(e) => e.key === 'Enter' && handleViewDetailsSubmit()}
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setShowViewDetailsModal(false); setViewDetailsPinInput(''); }}
+                  className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleViewDetailsSubmit}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+                >
+                  View Details
+                </button>
               </div>
             </div>
-
-
-           
           </div>
-        </div>
+        )}
 
         {/* PIN Verification Modal */}
         {showPinModal && (

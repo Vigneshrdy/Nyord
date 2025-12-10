@@ -92,6 +92,7 @@ class PasswordChange(BaseModel):
 
 # ------------------ ACCOUNT -------------------
 class AccountCreate(BaseModel):
+    account_type: str = "savings"  # 'savings' or 'current'
     initial_balance: float = 0.0
 
 
@@ -100,9 +101,24 @@ class AccountOut(BaseModel):
     account_number: str
     account_type: str
     balance: float
+    status: str
+    created_at: Optional[datetime]
+    approval_date: Optional[datetime]
 
     class Config:
         from_attributes = True
+
+
+class AccountApprovalRequest(BaseModel):
+    account_id: int
+    action: str  # 'approve' or 'reject'
+    reason: Optional[str] = None
+
+class InterAccountTransfer(BaseModel):
+    from_account_id: int
+    to_account_id: int
+    amount: float
+    description: Optional[str] = "Inter-account transfer"
 
 
 # ------------------ TOKEN -------------------
@@ -134,6 +150,8 @@ class TransactionOut(BaseModel):
     src_card_id: Optional[int] = None
     dest_card_id: Optional[int] = None
     transaction_type: str = "account_to_account"
+    src_user_name: Optional[str] = None
+    dest_user_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -145,12 +163,20 @@ class FixedDepositCreate(BaseModel):
     rate: float
     start_date: date
     tenure_months: int
+    account_id: int
+
+
+class FixedDepositRenew(BaseModel):
+    principal: float
+    tenure_months: int
+    account_id: int
 
 
 class FixedDepositOut(BaseModel):
     id: int
     fd_number: str
     user_id: int
+    account_id: Optional[int] = None
     principal: float
     rate: float
     start_date: date

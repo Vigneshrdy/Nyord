@@ -1,0 +1,184 @@
+/* Interactive Menu Styles */
+.interactive-menu {
+  --component-active-color: #06B6D4;
+  --menu-bg: rgba(255, 255, 255, 0.95);
+  --menu-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --menu-border: rgba(255, 255, 255, 0.2);
+  --text-color: #374151;
+  --text-color-active: var(--component-active-color);
+  --icon-color: #6B7280;
+  --icon-color-active: var(--component-active-color);
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: var(--menu-bg);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--menu-border);
+  box-shadow: var(--menu-shadow);
+  padding: 6px 12px 8px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-width: 100vw;
+  height: auto;
+  min-height: 60px;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 50px;
+  flex: 1;
+  max-width: 70px;
+}
+
+.menu-item:hover {
+  background: var(--hover-bg);
+  transform: translateY(-2px);
+}
+
+.menu-item.active {
+  transform: translateY(-4px);
+}
+
+.menu-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  width: var(--lineWidth, 0px);
+  height: 3px;
+  background: var(--component-active-color);
+  border-radius: 2px;
+  transform: translateX(-50%);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-item:hover .menu-icon,
+.menu-item.active .menu-icon {
+  transform: scale(1.1);
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  color: var(--icon-color);
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-item:hover .icon,
+.menu-item.active .icon {
+  color: var(--icon-color-active);
+}
+
+.menu-text {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-color);
+  text-transform: capitalize;
+  letter-spacing: 0.025em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.menu-item:hover .menu-text,
+.menu-text.active {
+  color: var(--text-color-active);
+  font-weight: 600;
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+  .interactive-menu {
+    --menu-bg: rgba(17, 24, 39, 0.95);
+    --menu-border: rgba(55, 65, 81, 0.3);
+    --text-color: #D1D5DB;
+    --icon-color: #9CA3AF;
+    --hover-bg: rgba(255, 255, 255, 0.1);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 320px) {
+  .interactive-menu {
+    padding: 4px 6px 6px;
+    min-height: 55px;
+  }
+  
+  .menu-item {
+    padding: 4px 6px;
+    min-width: 45px;
+  }
+  
+  .menu-icon {
+    width: 20px;
+    height: 20px;
+  }
+  
+  .icon {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .menu-text {
+    font-size: 8px;
+  }
+}
+
+@media (min-width: 768px) {
+  .interactive-menu {
+    display: none;
+  }
+}
+
+/* Animation enhancements */
+.menu-item {
+  animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+.menu-item:nth-child(1) { animation-delay: 0.1s; }
+.menu-item:nth-child(2) { animation-delay: 0.2s; }
+.menu-item:nth-child(3) { animation-delay: 0.3s; }
+.menu-item:nth-child(4) { animation-delay: 0.4s; }
+.menu-item:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Safe area padding for devices with notches */
+.interactive-menu {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}

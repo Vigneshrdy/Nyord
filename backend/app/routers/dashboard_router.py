@@ -4,7 +4,7 @@ from sqlalchemy import func, and_, or_
 from datetime import datetime, timedelta
 from ..database import get_db
 from ..models import Account, Transaction, FixedDeposit, Loan, Card, User
-from ..utils import get_current_user
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -39,7 +39,7 @@ def get_dashboard_summary(db: Session = Depends(get_db),
         for acc in accounts
     ]
     
-    # Get recent transactions (last 10)
+    # Get recent transactions (last 10) with detailed account and user info
     recent_transactions = []
     if account_ids:
         transactions = db.query(Transaction).filter(
@@ -51,14 +51,26 @@ def get_dashboard_summary(db: Session = Depends(get_db),
         
         for txn in transactions:
             is_debit = txn.src_account in account_ids
+            
+            # Get source account details
+            src_account = db.query(Account).filter(Account.id == txn.src_account).first()
+            src_user = db.query(User).filter(User.id == src_account.user_id).first() if src_account else None
+            
+            # Get destination account details  
+            dest_account = db.query(Account).filter(Account.id == txn.dest_account).first()
+            dest_user = db.query(User).filter(User.id == dest_account.user_id).first() if dest_account else None
+            
             recent_transactions.append({
                 "id": txn.id,
                 "amount": float(txn.amount),
                 "type": "debit" if is_debit else "credit",
                 "status": txn.status,
                 "timestamp": txn.timestamp.isoformat() if txn.timestamp else None,
-                "src_account": txn.src_account,
-                "dest_account": txn.dest_account
+                "src_account_number": src_account.account_number if src_account else None,
+                "dest_account_number": dest_account.account_number if dest_account else None,
+                "src_user_name": src_user.full_name or src_user.username if src_user else "Unknown",
+                "dest_user_name": dest_user.full_name or dest_user.username if dest_user else "Unknown",
+                "description": dest_user.full_name or dest_user.username if is_debit and dest_user else (src_user.full_name or src_user.username if not is_debit and src_user else "Transfer")
             })
     
     # Calculate monthly income and expenses (last 30 days)

@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import notificationService from '../services/notificationService';
 
-const BASE_URL = window.location.protocol === 'https:' ? 'https://taksari.me' : 'http://taksari.me';
+const BASE_URL = 'http://localhost:8000';
 
 const NotificationContext = createContext();
 
@@ -10,7 +11,6 @@ export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [ws, setWs] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('disconnected'); // 'connected', 'connecting', 'disconnected', 'polling'
 
   // Get token from localStorage
   const getToken = () => localStorage.getItem('token');
@@ -84,182 +84,139 @@ export function NotificationProvider({ children }) {
     }
   };
 
-  // Setup WebSocket connection with fallback to polling
+  // Setup WebSocket connection with reconnect logic
   useEffect(() => {
+    let mounted = true;
     const token = getToken();
     if (!user || !token) {
       console.log('No user or token available for WebSocket connection');
       return;
     }
 
+    console.log('Setting up WebSocket connection for user:', user.id);
+
     let websocket = null;
-    let reconnectAttempts = 0;
-    let pollingInterval = null;
-    let isWebSocketConnected = false;
-    const maxReconnectAttempts = 3;
-    const reconnectDelay = 5000;
-    const pollingInterval_ms = 10000; // Poll every 10 seconds as fallback
+    let reconnectTimer = null;
 
-    const startPolling = () => {
-      if (pollingInterval) return; // Already polling
-      
-      console.log('Starting polling fallback for real-time updates');
-      setConnectionStatus('polling');
-      pollingInterval = setInterval(() => {
-        if (!isWebSocketConnected) {
-          fetchNotifications();
-          fetchStats();
-        }
-      }, pollingInterval_ms);
-    };
-
-    const stopPolling = () => {
-      if (pollingInterval) {
-        console.log('Stopping polling fallback');
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-      }
-    };
-
-    const connectWebSocket = () => {
+    const connect = () => {
+      if (!mounted) return;
       try {
-        console.log(`Setting up WebSocket connection for user: ${user.id}, attempt: ${reconnectAttempts + 1}`);
-        setConnectionStatus('connecting');
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//taksari.me/ws?token=${token}`;
-        websocket = new WebSocket(wsUrl);
+        websocket = new WebSocket(`${BASE_URL.replace('http', 'ws')}/ws?token=${token}`);
+      } catch (err) {
+        console.error('Failed to construct WebSocket:', err);
+        scheduleReconnect();
+        return;
+      }
+
+      websocket.onopen = () => {
+        console.log('WebSocket connected for notifications, user:', user.id);
+        try {
+          websocket.send(JSON.stringify({ type: 'subscribe_notifications' }));
+        } catch (err) {
+          console.error('Failed to send subscribe message:', err);
+        }
+      };
+
+      websocket.onmessage = (event) => {
+      console.log('WebSocket message received:', event.data);
+      try {
+        const data = JSON.parse(event.data);
+        console.log('Parsed WebSocket data:', data);
         
-        const connectionTimeout = setTimeout(() => {
-          if (websocket && websocket.readyState === WebSocket.CONNECTING) {
-            console.log('WebSocket connection timeout, falling back to polling');
-            websocket.close();
-            startPolling();
-          }
-        }, 5000);
-
-        websocket.onopen = () => {
-          clearTimeout(connectionTimeout);
-          console.log('WebSocket connected for notifications, user:', user.id);
-          isWebSocketConnected = true;
-          reconnectAttempts = 0;
-          setConnectionStatus('connected');
-          stopPolling(); // Stop polling since WebSocket is working
+        if (data.type === 'notification' && data.data) {
+          console.log('Adding new notification:', data.data);
+          // Add new notification to the list
+          setNotifications(prev => [data.data, ...prev]);
+          setUnreadCount(prev => prev + 1);
           
-          try {
-            websocket.send(JSON.stringify({ type: 'subscribe_notifications' }));
-          } catch (error) {
-            console.error('Error sending subscription message:', error);
-          }
-        };
-
-        websocket.onmessage = (event) => {
-          console.log('WebSocket message received:', event.data);
-          try {
-            const data = JSON.parse(event.data);
-            console.log('Parsed WebSocket data:', data);
-            
-            if (data.type === 'notification' && data.data) {
-              console.log('Adding new notification:', data.data);
-              setNotifications(prev => [data.data, ...prev]);
-              setUnreadCount(prev => prev + 1);
-              
-              if (Notification.permission === 'granted') {
-                new Notification(data.data.title, {
-                  body: data.data.message,
-                  icon: '/favicon.ico'
-                });
-              }
-            } else if (data.type === 'transaction.success') {
-              console.log('Transaction completed:', data);
-              setTimeout(() => {
-                fetchNotifications();
-                fetchStats();
-              }, 1000);
-              
-              window.dispatchEvent(new CustomEvent('balanceUpdate', {
-                detail: {
-                  transactionId: data.transaction_id,
-                  amount: data.amount,
-                  newSrcBalance: data.new_src_balance,
-                  newDestBalance: data.new_dest_balance
-                }
-              }));
-            } else if (data.type === 'notification_subscription') {
-              console.log('Notification subscription confirmed:', data);
-            } else {
-              console.log('Unhandled WebSocket message type:', data.type, data);
-            }
-          } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-          }
-        };
-
-        websocket.onerror = (error) => {
-          clearTimeout(connectionTimeout);
-          console.error('WebSocket error:', error);
-          isWebSocketConnected = false;
-          setConnectionStatus('disconnected');
-        };
-
-        websocket.onclose = (event) => {
-          clearTimeout(connectionTimeout);
-          console.log('WebSocket disconnected, code:', event.code, 'reason:', event.reason);
-          isWebSocketConnected = false;
-          
-          if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts && user && getToken()) {
-            reconnectAttempts++;
-            console.log(`Attempting to reconnect WebSocket in ${reconnectDelay/1000}s... (${reconnectAttempts}/${maxReconnectAttempts})`);
-            setTimeout(connectWebSocket, reconnectDelay);
+          // Show browser notification using notification service
+          const notificationData = data.data;
+          if (notificationData.category === 'transaction') {
+            notificationService.showTransactionNotification(notificationData);
+          } else if (notificationData.category === 'loan') {
+            notificationService.showLoanNotification(notificationData.message, notificationData.type === 'loan_approved');
+          } else if (notificationData.category === 'kyc') {
+            notificationService.showKYCNotification(notificationData.message, notificationData.type === 'kyc_approved');
           } else {
-            console.log('WebSocket reconnection failed or max attempts reached, using polling fallback');
-            startPolling();
+            notificationService.showAccountNotification(notificationData.message, notificationData.type || 'info');
           }
-        };
-
+        } else if (data.type === 'transaction.success') {
+          console.log('Transaction completed:', data);
+          // Refresh notifications to get any new transaction notifications
+          setTimeout(() => {
+            fetchNotifications();
+            fetchStats();
+          }, 1000); // Wait a bit for backend to process notifications
+          
+          // Trigger balance refresh for the user
+          window.dispatchEvent(new CustomEvent('balanceUpdate', {
+            detail: {
+              transactionId: data.transaction_id,
+              amount: data.amount,
+              newSrcBalance: data.new_src_balance,
+              newDestBalance: data.new_dest_balance
+            }
+          }));
+        } else if (data.type === 'notification_subscription') {
+          console.log('Notification subscription confirmed:', data);
+        } else {
+          console.log('Unhandled WebSocket message type:', data.type, data);
+        }
       } catch (error) {
-        console.error('Failed to create WebSocket connection:', error);
-        startPolling();
+        console.error('Error parsing WebSocket message:', error);
       }
     };
 
-    // Start connection attempt
-    connectWebSocket();
-    setWs(websocket);
+      websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        // force close to trigger onclose and reconnection flow
+        try { websocket.close(); } catch (_) {}
+      };
+
+      websocket.onclose = (event) => {
+        console.log('WebSocket disconnected, code:', event.code, 'reason:', event.reason);
+        if (!mounted) return;
+        // Reconnect after delay unless closed intentionally (1000)
+        if (event.code !== 1000 && user && getToken()) {
+          scheduleReconnect();
+        }
+      };
+
+      setWs(websocket);
+    };
+
+    const scheduleReconnect = () => {
+      if (reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        console.log('Attempting to reconnect WebSocket...');
+        connect();
+      }, 5000);
+    };
+
+    connect();
 
     return () => {
-      console.log('Cleaning up WebSocket and polling');
-      isWebSocketConnected = false;
-      stopPolling();
+      mounted = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       if (websocket) {
-        websocket.close(1000, 'Component unmounting');
+        try { websocket.close(1000, 'closing'); } catch (_) {}
       }
     };
   }, [user]);
 
-  // Initial data fetch and periodic refresh
+  // Initial data fetch
   useEffect(() => {
     if (user && getToken()) {
       fetchNotifications();
       fetchStats();
-      
-      // Set up periodic refresh every 30 seconds
-      const refreshInterval = setInterval(() => {
-        fetchNotifications();
-        fetchStats();
-      }, 30000);
-
-      return () => {
-        clearInterval(refreshInterval);
-      };
     }
   }, [user]);
 
   // Request notification permission
-  useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+  // We do not automatically prompt for Notification permission on page load
+  // to avoid unexpected browser permission popups. Permission should be
+  // requested from a user action (settings/opt-in) when appropriate.
 
   const markAsRead = async (notificationId) => {
     const token = getToken();
@@ -376,7 +333,6 @@ export function NotificationProvider({ children }) {
   const value = {
     notifications,
     unreadCount,
-    connectionStatus,
     markAsRead,
     markAllAsRead,
     deleteNotification,

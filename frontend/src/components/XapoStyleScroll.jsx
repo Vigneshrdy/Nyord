@@ -71,7 +71,7 @@ const XapoStyleScroll = () => {
       id: 3,
       leftCategory: "INVEST WITH EASE",
       leftTitle: "YOUR WHOLE INVESTMENT PORTFOLIO, IN ONE PLACE",
-      leftDescription: "Diversify your portfolio with stocks and traditional assets all in one secure platform.",
+      leftDescription: "Diversify your portfolio with investments and traditional assets all in one secure platform.",
       leftButton: "Start investing",
       rightTitle: "Build your financial future",
       rightDescription: "Access global markets and manage your entire investment portfolio with institutional-grade security and competitive fees.",
@@ -80,7 +80,7 @@ const XapoStyleScroll = () => {
         mainValue: "$125,847.32",
         subtitle: "+$2,847.12 (+2.31%) today",
         items: [
-          { label: "Tech Stocks", value: "$45,230.12", subValue: "+5.2%" },
+          { label: "Tech Investments", value: "$45,230.12", subValue: "+5.2%" },
           { label: "Index Funds", value: "$28,945.67", subValue: "+3.1%" },
           { label: "Bonds", value: "$35,671.23", subValue: "+1.8%" },
           { label: "Cash", value: "$16,000.30", subValue: "0.0%" }

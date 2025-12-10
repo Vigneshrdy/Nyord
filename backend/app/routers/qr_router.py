@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from ..database import get_db
-from ..models import User
+from ..models import User, Account
 from ..utils import get_current_user
-from ..qr_utils import generate_user_qr_code, generate_user_qr_hash, verify_qr_code
+from ..qr_utils import generate_user_qr_code, generate_user_qr_hash, verify_qr_code, generate_account_qr_hash
 from typing import Optional
+import json
+from urllib.parse import urlparse, parse_qs
 
 class QRDecodeRequest(BaseModel):
     qr_data: str
@@ -98,12 +100,11 @@ def decode_qr_data(
     db: Session = Depends(get_db)
 ):
     """
-    Decode QR code data and extract user information for transactions.
-    This endpoint processes the raw QR code text (URL) and returns user details.
+    Decode QR code data and extract user or account information for transactions.
+    This endpoint processes the raw QR code text (URL) and returns recipient details.
+    Supports both user QR codes (?to=user_id) and account QR codes (?account=account_id).
     """
     try:
-        from urllib.parse import urlparse, parse_qs
-        
         # Get the QR data from request body
         qr_data = request.qr_data.strip()
         
@@ -112,20 +113,94 @@ def decode_qr_data(
             parsed_url = urlparse(qr_data)
             query_params = parse_qs(parsed_url.query)
             
-            # Extract user ID and hash from URL parameters
-            user_id = query_params.get("to", [None])[0]
             qr_hash = query_params.get("hash", [None])[0]
-            
-            if not user_id or not qr_hash:
+            if not qr_hash:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid QR code format - missing parameters"
+                    detail="Invalid QR code format - missing hash"
                 )
             
-            user_id = int(user_id)
+            # Check if it's an account QR code
+            account_id = query_params.get("account", [None])[0]
+            if account_id:
+                # Account QR code
+                account_id = int(account_id)
+                
+                # Get account details
+                target_account = db.query(Account).filter(Account.id == account_id).first()
+                if not target_account:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Account not found"
+                    )
+                
+                # Verify the QR hash
+                expected_hash = generate_account_qr_hash(account_id)
+                if qr_hash != expected_hash:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid or tampered QR code"
+                    )
+                
+                # Get user who owns the account
+                target_user = db.query(User).filter(User.id == target_account.user_id).first()
+                
+                return {
+                    "valid": True,
+                    "qr_type": "account",
+                    "recipient": {
+                        "user_id": target_user.id,
+                        "username": target_user.username,
+                        "full_name": target_user.full_name,
+                        "email": target_user.email,
+                        "account_id": target_account.id,
+                        "account_number": target_account.account_number,
+                        "account_type": target_account.account_type
+                    },
+                    "decoded_by": current_user.id,
+                    "can_transact": target_account.user_id != current_user.id
+                }
+            else:
+                # User QR code
+                user_id = query_params.get("to", [None])[0]
+                if not user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid QR code format - missing user or account identifier"
+                    )
+                
+                user_id = int(user_id)
+                
+                # Get user details
+                target_user = db.query(User).filter(User.id == user_id).first()
+                if not target_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="User not found"
+                    )
+                
+                # Verify the QR hash
+                expected_hash = generate_user_qr_hash(user_id)
+                if qr_hash != expected_hash:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid or tampered QR code"
+                    )
+                
+                return {
+                    "valid": True,
+                    "qr_type": "user",
+                    "recipient": {
+                        "user_id": target_user.id,
+                        "username": target_user.username,
+                        "full_name": target_user.full_name,
+                        "email": target_user.email
+                    },
+                    "decoded_by": current_user.id,
+                    "can_transact": target_user.id != current_user.id
+                }
         else:
             # Try to parse as JSON (old format)
-            import json
             qr_json = json.loads(qr_data)
             user_id = qr_json.get("user_id")
             qr_hash = qr_json.get("qr_hash")
@@ -135,40 +210,43 @@ def decode_qr_data(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid QR code format"
                 )
-        
-        # Get user details
-        target_user = db.query(User).filter(User.id == user_id).first()
-        if not target_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        # Verify the QR hash
-        expected_hash = generate_user_qr_hash(user_id)
-        if qr_hash != expected_hash:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or tampered QR code"
-            )
-        
-        return {
-            "valid": True,
-            "recipient": {
-                "user_id": target_user.id,
-                "username": target_user.username,
-                "full_name": target_user.full_name,
-                "email": target_user.email
-            },
-            "decoded_by": current_user.id,
-            "can_transact": target_user.id != current_user.id  # Can't send money to yourself
-        }
+            
+            # Get user details
+            target_user = db.query(User).filter(User.id == user_id).first()
+            if not target_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
+                )
+            
+            # Verify the QR hash
+            expected_hash = generate_user_qr_hash(user_id)
+            if qr_hash != expected_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid or tampered QR code"
+                )
+            
+            return {
+                "valid": True,
+                "qr_type": "user",
+                "recipient": {
+                    "user_id": target_user.id,
+                    "username": target_user.username,
+                    "full_name": target_user.full_name,
+                    "email": target_user.email
+                },
+                "decoded_by": current_user.id,
+                "can_transact": target_user.id != current_user.id
+            }
         
     except (json.JSONDecodeError, ValueError) as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid QR code format"
+            detail=f"Invalid QR code format: {str(e)}"
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

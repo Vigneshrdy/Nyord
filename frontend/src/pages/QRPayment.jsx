@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import QRScanner from '../components/QRScanner';
 import QRUploader from '../components/QRUploader';
 import QRTransactionConfirm from '../components/QRTransactionConfirm';
-import { apiRequest } from '../services/api';
+import { transactionsAPI } from '../services/api';
 
 const QRPayment = () => {
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'upload'
   const [step, setStep] = useState('input'); // 'input', 'confirm', 'success'
   const [scannedData, setScannedData] = useState(null);
@@ -22,13 +24,7 @@ const QRPayment = () => {
 
     try {
       // Decode the QR code data through backend
-      // Send the QR data as JSON with proper structure
-      const response = await apiRequest('/qr/decode', {
-        method: 'POST',
-        body: JSON.stringify({
-          qr_data: qrData
-        })
-      });
+      const response = await transactionsAPI.decodeQR(qrData);
 
       if (response.valid && response.can_transact) {
         setRecipient(response.recipient);
@@ -67,10 +63,7 @@ const QRPayment = () => {
     setError('');
 
     try {
-      const response = await apiRequest('/transactions/qr-transfer', {
-        method: 'POST',
-        body: JSON.stringify(transactionData),
-      });
+      const response = await transactionsAPI.processQRPayment(transactionData);
 
       setTransaction(response);
       setStep('success');
@@ -121,20 +114,20 @@ const QRPayment = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center mb-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="mr-4 p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              className="mr-4 p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               <span className="material-symbols-outlined">arrow_back</span>
             </button>
-            <h1 className="text-3xl font-bold text-gray-900">QR Payment</h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">QR Payment</h1>
           </div>
-          <p className="text-gray-600">Send money by scanning or uploading a QR code</p>
+          <p className="text-gray-600 dark:text-gray-400">Send money by scanning or uploading a QR code</p>
         </div>
 
         {/* Progress Indicator */}

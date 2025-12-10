@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminAPI } from '../services/api';
 import { useNotifications } from '../contexts/NotificationApiContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoanApprovalDashboard = () => {
   const { showSuccess, showError } = useNotifications();
@@ -9,9 +10,14 @@ const LoanApprovalDashboard = () => {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
 
+  const { user, loading: authLoading } = useAuth();
+
   useEffect(() => {
-    loadPendingLoans();
-  }, []);
+    // Only attempt to load admin data when the user is an admin
+    if (user && user.role === 'admin') {
+      loadPendingLoans();
+    }
+  }, [user]);
 
   const loadPendingLoans = async () => {
     try {
@@ -94,6 +100,26 @@ const LoanApprovalDashboard = () => {
     const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
     return monthlyPayment;
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-600">Checking permissions...</span>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 px-4 py-3 rounded-lg">
+        <div className="flex items-center">
+          <span className="material-symbols-outlined mr-2">lock</span>
+          You need admin privileges to view this dashboard.
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

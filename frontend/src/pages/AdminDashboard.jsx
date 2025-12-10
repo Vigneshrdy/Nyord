@@ -6,9 +6,10 @@ import { adminAPI } from '../services/api';
 import KYCApprovalDashboard from '../components/KYCApprovalDashboard';
 import LoanApprovalDashboard from '../components/LoanApprovalDashboard';
 import CardApprovalDashboard from '../components/CardApprovalDashboard';
+import AccountApprovals from '../components/AccountApprovals';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { showSuccess, showError } = useNotifications();
   const location = useLocation();
   const [stats, setStats] = useState(null);
@@ -18,20 +19,73 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
-  // Get active tab from URL
-  const getActiveTabFromPath = () => {
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Update active tab from URL path
+  useEffect(() => {
     const path = location.pathname;
-    if (path === '/admin') return 'overview';
-    if (path.includes('/kyc')) return 'kyc';
-    if (path.includes('/loans')) return 'loans';
-    if (path.includes('/cards')) return 'cards';
-    if (path.includes('/users')) return 'users';
-    if (path.includes('/transactions')) return 'transactions';
-    if (path.includes('/accounts')) return 'accounts';
-    return 'overview';
+    if (path === '/admin/kyc') {
+      setActiveTab('kyc');
+    } else if (path === '/admin/loans') {
+      setActiveTab('loans');
+    } else if (path === '/admin/cards') {
+      setActiveTab('cards');
+    } else if (path === '/admin/accounts') {
+      setActiveTab('accounts');
+    } else if (path === '/admin/users') {
+      setActiveTab('users');
+    } else if (path === '/admin/transactions') {
+      setActiveTab('transactions');
+    } else {
+      setActiveTab('overview');
+    }
+  }, [location.pathname]);
+
+  // Refresh data when specific tabs become active (only for admins)
+  useEffect(() => {
+    if (!user || user.role !== 'admin') return;
+    if (activeTab === 'transactions') {
+      refreshTransactions();
+    } else if (activeTab === 'users' || activeTab === 'accounts') {
+      loadAdminData();
+    }
+  }, [activeTab, user]);
+
+  const refreshTransactions = async () => {
+    try {
+      setLoading(true);
+      const [transactionsRes, usersRes, accountsRes] = await Promise.all([
+        adminAPI.getTransactions(0, 50), // Get more transactions
+        adminAPI.getAllUsers(),
+        adminAPI.getAccounts(0, 100)
+      ]);
+      
+      setTransactions(transactionsRes);
+      
+      // Enrich transactions with user data
+      const enrichedTransactions = transactionsRes.map(transaction => {
+        const srcAccount = accountsRes.find(acc => acc.id === transaction.src_account);
+        const destAccount = accountsRes.find(acc => acc.id === transaction.dest_account);
+        const srcUser = usersRes.find(user => user.id === srcAccount?.user_id);
+        const destUser = usersRes.find(user => user.id === destAccount?.user_id);
+        
+        return {
+          ...transaction,
+          srcUser: srcUser || null,
+          destUser: destUser || null,
+          srcAccountNumber: srcAccount?.account_number || transaction.src_account,
+          destAccountNumber: destAccount?.account_number || transaction.dest_account
+        };
+      });
+      
+      setTransactionsWithUsers(enrichedTransactions);
+    } catch (err) {
+      console.error('Failed to refresh transactions:', err);
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const activeTab = getActiveTabFromPath();
   const [accountsWithUsers, setAccountsWithUsers] = useState([]);
   const [transactionsWithUsers, setTransactionsWithUsers] = useState([]);
   const [allCards, setAllCards] = useState([]);
@@ -52,8 +106,10 @@ const AdminDashboard = () => {
   });
 
   useEffect(() => {
-    loadAdminData();
-  }, []);
+    if (user && user.role === 'admin') {
+      loadAdminData();
+    }
+  }, [user]);
 
   const loadAdminData = async () => {
     try {
@@ -240,15 +296,15 @@ const AdminDashboard = () => {
     const amount = prompt(`Current balance: $${currentBalance}\nEnter adjustment amount (use + for credit, - for debit):`);
     if (!amount) return;
     
-    const reason = prompt('Enter reason for adjustment:');
+    const reason = prompt('Enter reason for balance adjustment:', 'Administrative adjustment');
     if (!reason) return;
     
     try {
       await adminAPI.adjustBalance(accountId, parseFloat(amount), reason);
-      alert('Balance adjusted successfully!');
+      showSuccess('Balance adjusted successfully!');
       loadAdminData(); // Refresh data
     } catch (error) {
-      alert('Failed to adjust balance: ' + error.message);
+      showError('Failed to adjust balance: ' + error.message);
     }
   };
 
@@ -256,13 +312,15 @@ const AdminDashboard = () => {
     const action = currentStatus ? 'deactivate' : 'activate';
     if (!confirm(`Are you sure you want to ${action} this account?`)) return;
     
+    const reason = prompt(`Enter reason to ${action} this account:`, `Account ${action}d by admin`);
+    if (!reason) return;
+    
     try {
-      // For now, just show a message since the backend endpoint might not exist
-      alert(`Account ${action} functionality would be implemented here`);
-      // await adminAPI.toggleAccountStatus(accountId, !currentStatus);
-      // loadAdminData(); // Refresh data
+      await adminAPI.toggleAccount(accountId, !currentStatus, reason);
+      showSuccess(`Account ${action}d successfully!`);
+      loadAdminData(); // Refresh data
     } catch (error) {
-      alert(`Failed to ${action} account: ` + error.message);
+      showError(`Failed to ${action} account: ` + error.message);
     }
   };
 
@@ -314,6 +372,87 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
     }
   };
 
+  const handleEditUser = (user) => {
+    const updatedRole = user.role === 'admin' ? 'customer' : 'admin';
+    const updatedKyc = !user.kyc_approved;
+    
+    if (window.confirm(`Update user ${user.username || user.full_name}?\n\nChange role to: ${updatedRole}\nChange KYC status to: ${updatedKyc ? 'Approved' : 'Pending'}`)) {
+      adminAPI.updateUser(user.id, {
+        role: updatedRole,
+        kyc_approved: updatedKyc
+      }).then(() => {
+        showSuccess('User Updated', 'User has been updated successfully');
+        fetchUsers();
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Update Failed', err.message || 'Failed to update user');
+      });
+    }
+  };
+
+  const handleDeleteUser = (userId, userName) => {
+    if (window.confirm(`Are you sure you want to delete user "${userName}"?\n\nThis action cannot be undone and will delete all associated accounts, loans, and cards.`)) {
+      adminAPI.deleteUser(userId).then(() => {
+        showSuccess('User Deleted', 'User has been deleted successfully');
+        fetchUsers();
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete user');
+      });
+    }
+  };
+
+  const handleDeleteAccount = (accountId, accountNumber) => {
+    if (window.confirm(`Are you sure you want to delete account "${accountNumber}"?\n\nThis action cannot be undone.`)) {
+      adminAPI.deleteAccount(accountId).then(() => {
+        showSuccess('Account Deleted', 'Account has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete account');
+      });
+    }
+  };
+
+  const handleApproveCard = (cardId) => {
+    adminAPI.approveCard(cardId).then(() => {
+      showSuccess('Card Approved', 'Card has been approved successfully');
+      fetchComprehensiveUserData();
+    }).catch(err => {
+      showError('Approval Failed', err.message || 'Failed to approve card');
+    });
+  };
+
+  const handleDeleteCard = (cardId) => {
+    if (window.confirm('Are you sure you want to delete this card?\n\nThis action cannot be undone.')) {
+      adminAPI.deleteCard(cardId).then(() => {
+        showSuccess('Card Deleted', 'Card has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete card');
+      });
+    }
+  };
+
+  const handleApproveLoan = (loanId) => {
+    adminAPI.approveLoan(loanId).then(() => {
+      showSuccess('Loan Approved', 'Loan has been approved successfully');
+      fetchComprehensiveUserData();
+    }).catch(err => {
+      showError('Approval Failed', err.message || 'Failed to approve loan');
+    });
+  };
+
+  const handleDeleteLoan = (loanId) => {
+    if (window.confirm('Are you sure you want to delete this loan?\n\nThis action cannot be undone.')) {
+      adminAPI.deleteLoan(loanId).then(() => {
+        showSuccess('Loan Deleted', 'Loan has been deleted successfully');
+        fetchComprehensiveUserData();
+      }).catch(err => {
+        showError('Delete Failed', err.message || 'Failed to delete loan');
+      });
+    }
+  };
+
   // Debug: Log user info to console
   console.log('AdminDashboard - Current user:', user);
   console.log('AdminDashboard - User role:', user?.role);
@@ -345,6 +484,8 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
           </div>
         </div>
       </div>
+
+
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
@@ -393,6 +534,9 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                 </div>
               ))}
             </div>
+
+            {/* Account Approvals - Always visible on overview */}
+            <AccountApprovals />
           </div>
         )}
 
@@ -1000,7 +1144,11 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
 
         {/* Accounts Tab - Comprehensive Financial Overview */}
         {activeTab === 'accounts' && (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+            {/* Account Approvals Section */}
+            <AccountApprovals />
+            
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Complete Financial Overview - All Users</h3>
@@ -1118,14 +1266,36 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">{account.account_number}</div>
                                       <div className="text-xs text-gray-500">{account.account_type || 'Savings'}</div>
                                     </div>
-                                    <div className="text-right">
-                                      <div className="text-sm font-semibold text-green-600">
-                                        ${account.balance?.toLocaleString() || '0.00'}
+                                    <div className="flex items-center space-x-3">
+                                      <div className="text-right">
+                                        <div className="text-sm font-semibold text-green-600">
+                                          ${account.balance?.toLocaleString() || '0.00'}
+                                        </div>
+                                        <div className={`text-xs ${
+                                          account.is_active !== false ? 'text-green-500' : 'text-red-500'
+                                        }`}>
+                                          {account.is_active !== false ? 'Active' : 'Inactive'}
+                                        </div>
                                       </div>
-                                      <div className={`text-xs ${
-                                        account.is_active !== false ? 'text-green-500' : 'text-red-500'
-                                      }`}>
-                                        {account.is_active !== false ? 'Active' : 'Inactive'}
+                                      <div className="flex flex-col space-y-1">
+                                        <button
+                                          onClick={() => handleAdjustBalance(account.id, account.balance)}
+                                          className="text-xs text-blue-600 hover:text-blue-800"
+                                        >
+                                          Adjust
+                                        </button>
+                                        <button
+                                          onClick={() => handleToggleAccount(account.id, account.is_active !== false)}
+                                          className="text-xs text-orange-600 hover:text-orange-800"
+                                        >
+                                          {account.is_active !== false ? 'Disable' : 'Enable'}
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteAccount(account.id, account.account_number)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1152,13 +1322,27 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">{card.card_number || 'Card'}</div>
                                       <div className="text-xs text-gray-500">{card.card_type || 'Credit'}</div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex items-center space-x-3">
                                       <div className={`text-xs px-2 py-1 rounded ${
                                         card.status === 'active' ? 'bg-green-100 text-green-800' :
                                         card.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
                                         {card.status || 'Pending'}
+                                      </div>
+                                      <div className="flex space-x-2">
+                                        <button
+                                          onClick={() => handleApproveCard(card.id)}
+                                          className="text-xs text-green-600 hover:text-green-800"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteCard(card.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1185,13 +1369,27 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                                       <div className="text-sm font-medium">${loan.principal?.toLocaleString() || '0'}</div>
                                       <div className="text-xs text-gray-500">{loan.purpose || 'General'} • {loan.duration_months}m</div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex items-center space-x-3">
                                       <div className={`text-xs px-2 py-1 rounded ${
                                         loan.status === 'approved' ? 'bg-green-100 text-green-800' :
                                         loan.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                                         'bg-red-100 text-red-800'
                                       }`}>
                                         {loan.status || 'Pending'}
+                                      </div>
+                                      <div className="flex space-x-2">
+                                        <button
+                                          onClick={() => handleApproveLoan(loan.id)}
+                                          className="text-xs text-green-600 hover:text-green-800"
+                                        >
+                                          Approve
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteLoan(loan.id)}
+                                          className="text-xs text-red-600 hover:text-red-800"
+                                        >
+                                          Delete
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1274,6 +1472,259 @@ Created: ${account.created_at ? new Date(account.created_at).toLocaleDateString(
                       );
                     })}
                   </div>
+                )}
+              </div>
+            </div>
+            </div>
+
+            {/* Sidebar for Admin - Quick Transfers + small widgets */}
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm overflow-hidden">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Transfers</h3>
+
+                <div className="flex items-center gap-3 mb-4">
+                  <button
+                    onClick={() => window.location.assign('/transfer')}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                  >
+                    Money Transfer
+                  </button>
+
+                  <button
+                    onClick={() => window.location.assign('/qr-payment')}
+                    className="inline-flex items-center gap-2 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    QR Transfer
+                  </button>
+                </div>
+
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Recent Transaction Users</p>
+                  {transactionsWithUsers && transactionsWithUsers.length > 0 ? (
+                    <div className="flex flex-wrap gap-3 max-h-28 overflow-auto">
+                      {transactionsWithUsers.slice(0, 5).map((t, idx) => (
+                            <button
+                              key={t.id || idx}
+                              type="button"
+                              onClick={() => {
+                                const recipient = (t.srcUser && t.srcUser.id && t.srcUser.id === user.id) ? t.destUser : t.srcUser;
+                                if (recipient) {
+                                  navigate('/transfer', { state: { recipientUser: recipient } });
+                                } else {
+                                  // fallback: open transfer page
+                                  navigate('/transfer');
+                                }
+                              }}
+                              className="flex flex-col items-center text-center w-20 focus:outline-none"
+                            >
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold ${idx % 2 === 0 ? 'bg-red-500' : 'bg-blue-500'}`}>
+                                {((t.srcUser?.full_name || t.destUser?.full_name) || (t.srcUser?.username || t.destUser?.username) || 'U').toString().charAt(0).toUpperCase()}
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1 truncate w-full">{(t.srcUser?.full_name || t.destUser?.full_name) || (t.srcUser?.username || t.destUser?.username) || 'Unknown'}</div>
+                            </button>
+                          ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">No recent transactions</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Optional small widgets could be added here (Totals, Spending) */}
+            </div>
+          </div>
+        )}
+
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-4 py-5 sm:p-6">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">User Management</h3>
+                
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KYC Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accounts</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map((user) => {
+                        const userData = comprehensiveUserData.find(u => u.user.id === user.id);
+                        return (
+                          <tr key={user.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-sm font-medium">
+                                    {user.full_name?.charAt(0) || user.username?.charAt(0) || 'U'}
+                                  </span>
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {user.full_name || user.username || `User ${user.id}`}
+                                  </div>
+                                  <div className="text-sm text-gray-500">ID: {user.id}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {user.email || 'No email'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
+                              }`}>
+                                {user.role || 'customer'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.kyc_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {user.kyc_approved ? 'Approved' : 'Pending'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {userData?.summary.accountsCount || 0}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              ${userData?.summary.totalBalance?.toLocaleString() || '0.00'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditUser(user)}
+                                  className="text-blue-600 hover:text-blue-900 font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.username || user.full_name)}
+                                  className="text-red-600 hover:text-red-900 font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Transactions Tab */}
+        {activeTab === 'transactions' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <div className="px-4 py-5 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">All Transactions</h3>
+                  <button
+                    onClick={refreshTransactions}
+                    disabled={loading}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )}
+                    {loading ? 'Refreshing...' : 'Refresh'}
+                  </button>
+                </div>
+                
+                {loading ? (
+                  <div className="flex justify-center py-8">
+                    <svg className="animate-spin h-8 w-8 text-gray-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  </div>
+                ) : transactionsWithUsers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions found</h3>
+                    <p className="mt-1 text-sm text-gray-500">There are no transactions to display at this time.</p>
+                  </div>
+                ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">To</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {transactionsWithUsers.map((transaction) => (
+                        <tr key={transaction.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            TXN-{transaction.id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{transaction.srcUser?.full_name || transaction.srcUser?.username || 'Unknown'}</div>
+                              <div className="text-gray-500">{transaction.srcAccountNumber}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <div>
+                              <div className="font-medium">{transaction.destUser?.full_name || transaction.destUser?.username || 'Unknown'}</div>
+                              <div className="text-gray-500">{transaction.destAccountNumber}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span className="font-semibold text-green-600">
+                              ${transaction.amount?.toLocaleString() || '0.00'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              transaction.status === 'SUCCESS'
+                                ? 'bg-green-100 text-green-800'
+                                : transaction.status === 'FAILED'
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {transaction.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {transaction.timestamp ? new Date(transaction.timestamp).toLocaleDateString() : 'Unknown'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 )}
               </div>
             </div>
